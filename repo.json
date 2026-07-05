@@ -11,8 +11,8 @@
     "Tags": ["venue", "roleplay", "penumbra"],
     "DalamudApiLevel": 15,
     "IconUrl": "https://raw.githubusercontent.com/IttoJinrah/puls8/main/pulse_logo.png",
-    "DownloadLinkInstall": "https://github.com/IttoJinrah/puls8/releases/download/plugin-v1.1/Puls8.zip",
-    "DownloadLinkTesting": "https://github.com/IttoJinrah/puls8/releases/download/plugin-v1.1/Puls8.zip",
-    "DownloadLinkUpdate": "https://github.com/IttoJinrah/puls8/releases/download/plugin-v1.1/Puls8.zip"
+    "DownloadLinkInstall": "https://github.com/IttoJinrah/puls8/releases/download/plugin-v1.2/Puls8.2.zip",
+    "DownloadLinkTesting": "https://github.com/IttoJinrah/puls8/releases/download/plugin-v1.2/Puls8.2.zip",
+    "DownloadLinkUpdate": "https://github.com/IttoJinrah/puls8/releases/download/plugin-v1.2/Puls8.2.zip"
   }
 ]
