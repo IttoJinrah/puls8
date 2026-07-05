@@ -3,7 +3,7 @@
     "Author": "Arka",
     "Name": "Puls8",
     "InternalName": "Puls8",
-    "AssemblyVersion": "0.1.0.0",
+    "AssemblyVersion": "0.1.0.1",
     "Description": "Panel and mod updater for the Puls8 venue.",
     "Punchline": "Panel and mod updater for the Puls8 venue.",
     "ApplicableVersion": "any",
@@ -11,8 +11,8 @@
     "Tags": ["venue", "roleplay", "penumbra"],
     "DalamudApiLevel": 15,
     "IconUrl": "https://raw.githubusercontent.com/IttoJinrah/puls8/main/pulse_logo.png",
-    "DownloadLinkInstall": "https://github.com/IttoJinrah/puls8/releases/download/plugin-v1.2/Puls8.2.zip",
-    "DownloadLinkTesting": "https://github.com/IttoJinrah/puls8/releases/download/plugin-v1.2/Puls8.2.zip",
-    "DownloadLinkUpdate": "https://github.com/IttoJinrah/puls8/releases/download/plugin-v1.2/Puls8.2.zip"
+    "DownloadLinkInstall": "https://github.com/IttoJinrah/puls8/releases/download/plugin-v1.2/Puls8.zip",
+    "DownloadLinkTesting": "https://github.com/IttoJinrah/puls8/releases/download/plugin-v1.2/Puls8.zip",
+    "DownloadLinkUpdate": "https://github.com/IttoJinrah/puls8/releases/download/plugin-v1.2/Puls8.zip"
   }
 ]
