@@ -3,7 +3,7 @@
           "Author": "Arka",
           "Name": "Puls8",
           "InternalName": "Puls8",
-          "AssemblyVersion": "0.1.0.1",
+                  "AssemblyVersion": "0.1.0.2",
           "Description": "Panel and mod updater for the Puls8 venue.",
           "Punchline": "Panel and mod updater for the Puls8 venue.",
           "ApplicableVersion": "any",
