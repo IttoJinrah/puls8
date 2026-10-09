@@ -1,0 +1,86 @@
+{
+  "schema": 1,
+  "name": "Puls8",
+  "tagline": "Rooftop Lounge and Pool",
+  "description": "Above the street, the water stays warm and the lights stay low. Puls8 is a rooftop lounge and pool for late hours: dark colors, neon accents, and a pool that looks better after midnight. High enough to feel private. Rough enough that you do not have to behave.",
+  "address": {
+    "world": "Raiden",
+    "dataCenter": "Light",
+    "district": "Lavender Beds",
+    "ward": 7,
+    "plot": 16,
+    "display": "Raiden · Lavender Beds · Ward 7 · Plot 16"
+  },
+  "timeZone": "Europe/London",
+  "schedule": [
+    {
+      "day": "Friday",
+      "open": "21:00",
+      "close": "01:00"
+    },
+    {
+      "day": "Saturday",
+      "open": "21:00",
+      "close": "02:00"
+    }
+  ],
+  "events": [
+    {
+      "id": "event-20261009181835",
+      "title": "New event",
+      "host": "",
+      "starts": "2026-10-16T21:00:00+03:00",
+      "minutes": 180,
+      "blurb": ""
+    }
+  ],
+  "links": [
+    {
+      "label": "Discord",
+      "url": "https://discord.gg/puls8",
+      "kind": "discord"
+    }
+  ],
+  "sync": [
+    {
+      "service": "Lightless",
+      "kind": "syncshell",
+      "id": "LLS-EZBSD40L6PAZ",
+      "password": "Club_Puls8",
+      "note": ""
+    },
+    {
+      "service": "PlayerSync",
+      "kind": "zonesync",
+      "id": "",
+      "password": "",
+      "note": "We don't run a PlayerSync syncshell. Turn on ZoneSync instead and you'll sync with everyone in the club automatically."
+    }
+  ],
+  "packs": [
+    {
+      "id": "cityscape",
+      "title": "Cityscape & Skybox",
+      "blurb": "The animated skyline that surrounds the club, worn by the venue mannequin.",
+      "tagPrefix": "mod-v",
+      "folder": "Puls8_Cityscape",
+      "target": "mannequin",
+      "collection": "Puls8",
+      "priority": 100,
+      "allOptions": false,
+      "targetsMannequin": true
+    },
+    {
+      "id": "venuepack",
+      "title": "Venue Pack",
+      "blurb": "Pool water, furniture and decor touches that make the club look the way it should.",
+      "tagPrefix": "venue_pack-v",
+      "folder": "Puls8_VenuePack",
+      "target": "base",
+      "collection": "",
+      "priority": 100,
+      "allOptions": true,
+      "targetsMannequin": false
+    }
+  ]
+}
