@@ -38,18 +38,21 @@ public sealed class PackInstaller : IDisposable
     private readonly PenumbraBridge penumbra;
     private readonly ReleaseCatalog catalog;
     private readonly MannequinLinker mannequins;
+    private readonly TemporaryVenue temporaryVenue;
     private CancellationTokenSource? cancellation;
     private PackSlot[] slots = [];
     private VenueAddress address = new();
     private int busy;
     private bool updateNoticeShown;
+    private DateTime nextVenueBuildUtc;
 
-    public PackInstaller(Configuration configuration, PenumbraBridge penumbra, ReleaseCatalog catalog, MannequinLinker mannequins)
+    public PackInstaller(Configuration configuration, PenumbraBridge penumbra, ReleaseCatalog catalog, MannequinLinker mannequins, TemporaryVenue temporaryVenue)
     {
         this.configuration = configuration;
         this.penumbra = penumbra;
         this.catalog = catalog;
         this.mannequins = mannequins;
+        this.temporaryVenue = temporaryVenue;
         penumbra.Changed += MarkStale;
     }
 
@@ -181,6 +184,55 @@ public sealed class PackInstaller : IDisposable
 
     public void OnZoneChanged() => NeedsZoneReload = false;
 
+    public MannequinTarget MannequinTarget => configuration.MannequinUsesSavedCollection
+        ? new MannequinTarget(configuration.MannequinCollectionId, false, 0)
+        : new MannequinTarget(temporaryVenue.CollectionId, true, temporaryVenue.Generation);
+
+    public PackSlot? MannequinSlot
+    {
+        get
+        {
+            var current = slots;
+            for (var slotIndex = 0; slotIndex < current.Length; slotIndex++)
+            {
+                if (current[slotIndex].Definition.TargetsMannequin)
+                {
+                    return current[slotIndex];
+                }
+            }
+
+            return null;
+        }
+    }
+
+    // Temporary collections die with every Penumbra or game restart, so the venue one is rebuilt whenever it's missing.
+    public void EnsureTemporaryVenue()
+    {
+        var now = DateTime.UtcNow;
+        if (configuration.MannequinUsesSavedCollection || temporaryVenue.IsReady || temporaryVenue.IsBuilding || IsBusy || now < nextVenueBuildUtc)
+        {
+            return;
+        }
+
+        var slot = MannequinSlot;
+        if (slot is null || !slot.InPenumbra || !Penumbra.Ready)
+        {
+            return;
+        }
+
+        nextVenueBuildUtc = now + TimeSpan.FromSeconds(30);
+        _ = temporaryVenue.BuildAsync(slot.Definition, Penumbra.ModDirectory);
+    }
+
+    public void UseSavedCollection(bool saved)
+    {
+        configuration.MannequinUsesSavedCollection = saved;
+        configuration.Save();
+        temporaryVenue.Invalidate();
+        nextVenueBuildUtc = default;
+        IsStale = true;
+    }
+
     public void Dispose()
     {
         penumbra.Changed -= MarkStale;
@@ -275,19 +327,35 @@ public sealed class PackInstaller : IDisposable
             }
 
             progress.Stage = InstallStage.Enabling;
-            var enableCode = await PenumbraBridge.OnFramework(() => EnableAndVerify(collection, definition)).ConfigureAwait(false);
-            if (enableCode != PenumbraApiEc.Success)
+            var temporary = definition.TargetsMannequin && !configuration.MannequinUsesSavedCollection;
+            if (temporary)
             {
-                throw new InstallException(enableCode == PenumbraApiEc.CollectionMissing
-                    ? Problems.CollectionMissing(definition.Collection)
-                    : Problems.Unexpected($"Penumbra answered {enableCode} while enabling the pack."));
+                await PenumbraBridge.OnFramework(temporaryVenue.Invalidate).ConfigureAwait(false);
+                if (!await temporaryVenue.BuildAsync(definition, state.ModDirectory).ConfigureAwait(false))
+                {
+                    throw new InstallException(Problems.Unexpected(temporaryVenue.LastError));
+                }
+            }
+            else
+            {
+                var enableCode = await PenumbraBridge.OnFramework(() => EnableAndVerify(collection, definition)).ConfigureAwait(false);
+                if (enableCode != PenumbraApiEc.Success)
+                {
+                    throw new InstallException(enableCode == PenumbraApiEc.CollectionMissing
+                        ? Problems.CollectionMissing(definition.Collection)
+                        : Problems.Unexpected($"Penumbra answered {enableCode} while enabling the pack."));
+                }
             }
 
             if (definition.TargetsMannequin)
             {
                 progress.Stage = InstallStage.Linking;
-                configuration.MannequinCollectionId = collection;
-                await PenumbraBridge.OnFramework(() => LinkIfAtVenue(collection)).ConfigureAwait(false);
+                if (!temporary)
+                {
+                    configuration.MannequinCollectionId = collection;
+                }
+
+                await PenumbraBridge.OnFramework(LinkIfAtVenue).ConfigureAwait(false);
             }
 
             var record = new InstalledPack { Tag = release.Tag, Digest = release.Sha256, InstalledUtc = DateTime.UtcNow };
@@ -376,6 +444,11 @@ public sealed class PackInstaller : IDisposable
 
     private Guid ResolveCollection(PackDefinition definition)
     {
+        if (definition.TargetsMannequin && !configuration.MannequinUsesSavedCollection)
+        {
+            return Guid.Empty;
+        }
+
         if (definition.TargetsMannequin)
         {
             var named = penumbra.FindCollection(definition.Collection);
@@ -408,15 +481,16 @@ public sealed class PackInstaller : IDisposable
         return penumbra.IsEnabled(collection, definition.Folder) ? PenumbraApiEc.Success : PenumbraApiEc.UnknownError;
     }
 
-    private int LinkIfAtVenue(Guid collection)
+    private int LinkIfAtVenue()
     {
         if (!VenueLocator.IsInside(address))
         {
             return 0;
         }
 
-        mannequins.Scan(penumbra, collection);
-        return mannequins.LinkAll(penumbra, collection);
+        var target = MannequinTarget;
+        mannequins.Scan(penumbra, target);
+        return mannequins.LinkAll(penumbra, temporaryVenue, target);
     }
 
     private void ReadPenumbra(PackSlot[] current)
@@ -428,6 +502,12 @@ public sealed class PackInstaller : IDisposable
             var slot = current[slotIndex];
             slot.InPenumbra = Penumbra.Ready && penumbra.HasMod(slot.Definition.Folder);
             AdoptExistingMannequinCollection(slot);
+            if (slot.Definition.TargetsMannequin && !configuration.MannequinUsesSavedCollection)
+            {
+                slot.Enabled = slot.InPenumbra;
+                continue;
+            }
+
             var collection = slot.Definition.TargetsMannequin ? configuration.MannequinCollectionId : baseCollection?.Id ?? Guid.Empty;
             slot.Enabled = slot.InPenumbra && collection != Guid.Empty && penumbra.IsEnabled(collection, slot.Definition.Folder);
         }
@@ -436,7 +516,7 @@ public sealed class PackInstaller : IDisposable
     // 0.1.x installs already have a hand-made collection; adopting it lets auto-link work before the first reinstall.
     private void AdoptExistingMannequinCollection(PackSlot slot)
     {
-        if (!slot.InPenumbra || !slot.Definition.TargetsMannequin || configuration.MannequinCollectionId != Guid.Empty)
+        if (!slot.InPenumbra || !slot.Definition.TargetsMannequin || !configuration.MannequinUsesSavedCollection || configuration.MannequinCollectionId != Guid.Empty)
         {
             return;
         }
@@ -477,5 +557,11 @@ public sealed class PackInstaller : IDisposable
         slot.Progress.Stage = InstallStage.Failed;
     }
 
-    private void MarkStale() => IsStale = true;
+    // Penumbra loading or unloading discards every temporary collection.
+    private void MarkStale()
+    {
+        IsStale = true;
+        temporaryVenue.Invalidate();
+        nextVenueBuildUtc = default;
+    }
 }

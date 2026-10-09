@@ -19,6 +19,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly WindowSystem windows = new("Puls8");
     private readonly MainWindow mainWindow;
     private DateTime nextAutoLinkUtc;
+    private bool cityscapeAnnounced;
 
     public Plugin(IDalamudPluginInterface pluginInterface)
     {
@@ -30,7 +31,8 @@ public sealed class Plugin : IDalamudPlugin
         Penumbra = new PenumbraBridge();
         Catalog = new ReleaseCatalog();
         Mannequins = new MannequinLinker();
-        Installer = new PackInstaller(Configuration, Penumbra, Catalog, Mannequins);
+        Venue = new TemporaryVenue();
+        Installer = new PackInstaller(Configuration, Penumbra, Catalog, Mannequins, Venue);
         Travel = new TravelService(new LifestreamBridge());
         Staff = new StaffSession(Configuration, Feed);
         Installer.Bind(Feed.Current);
@@ -69,6 +71,8 @@ public sealed class Plugin : IDalamudPlugin
 
     public MannequinLinker Mannequins { get; }
 
+    public TemporaryVenue Venue { get; }
+
     public PackInstaller Installer { get; }
 
     public TravelService Travel { get; }
@@ -88,6 +92,7 @@ public sealed class Plugin : IDalamudPlugin
         windows.RemoveAllWindows();
         mainWindow.Dispose();
         Installer.Dispose();
+        Venue.Dispose();
         Penumbra.Dispose();
         Fonts.Dispose();
     }
@@ -117,20 +122,24 @@ public sealed class Plugin : IDalamudPlugin
     private void TryAutoLinkMannequins()
     {
         var now = DateTime.UtcNow;
-        if (now < nextAutoLinkUtc || !Configuration.AutoLinkMannequins || Configuration.MannequinCollectionId == Guid.Empty)
+        if (now < nextAutoLinkUtc || !Installer.Penumbra.Ready)
         {
             return;
         }
 
         nextAutoLinkUtc = now + AutoLinkInterval;
-        if (!Travel.IsInsideVenue || !Installer.Penumbra.Ready)
+        Installer.EnsureTemporaryVenue();
+        var target = Installer.MannequinTarget;
+        if (!Configuration.AutoLinkMannequins || !Travel.IsInsideVenue || target.Collection == Guid.Empty)
         {
             return;
         }
 
-        var linked = Mannequins.AutoLink(Penumbra, Configuration.MannequinCollectionId);
-        if (linked > 0)
+        // Temporary links are redone on every visit, so only the first one of a session gets a chat line.
+        var linked = Mannequins.AutoLink(Penumbra, Venue, target);
+        if (linked > 0 && !cityscapeAnnounced)
         {
+            cityscapeAnnounced = true;
             Services.Chat.Print("The Cityscape is now showing on the venue mannequin. Welcome in!", "Puls8", 541);
         }
     }

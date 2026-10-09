@@ -329,30 +329,43 @@ public sealed class ModsPage
 
     private void DrawMannequins(PackInstaller installer)
     {
-        var mannequinPack = FindMannequinPack(installer.Slots);
+        var mannequinPack = installer.MannequinSlot;
         if (mannequinPack is null)
         {
             return;
         }
 
         var configuration = plugin.Configuration;
+        var saved = configuration.MannequinUsesSavedCollection;
         ImGui.Spacing();
         Widgets.SectionTitle("MANNEQUIN LINK", 91);
         using var card = Widgets.Card(Palette.Cyan);
-        Widgets.Wrapped($"The {mannequinPack.Definition.Title} is worn by the club's mannequin through the \"{mannequinPack.Definition.Collection}\" collection. Puls8 links it for you the moment you walk in.", Palette.InkMuted);
+        var explanation = saved
+            ? $"The {mannequinPack.Definition.Title} is worn by the club's mannequin through your saved \"{mannequinPack.Definition.Collection}\" collection."
+            : $"The {mannequinPack.Definition.Title} is worn by the club's mannequin through a temporary venue collection Puls8 builds each session. Nothing is added to your own Penumbra setup.";
+        Widgets.Wrapped(explanation, Palette.InkMuted);
+        ImGui.Spacing();
+        DrawVenueCollectionStatus(mannequinPack, saved);
+
         ImGui.Spacing();
         var autoLink = configuration.AutoLinkMannequins;
-        if (Widgets.Toggle("##autolink", "Link automatically inside the club", "Penumbra remembers the link, so this only runs when something's missing.", ref autoLink))
+        if (Widgets.Toggle("##autolink", "Link automatically inside the club", "Checked every few seconds while you're there; mannequins that reload are linked again.", ref autoLink))
         {
             configuration.AutoLinkMannequins = autoLink;
             configuration.Save();
         }
 
         ImGui.Spacing();
-        var collection = configuration.MannequinCollectionId;
-        if (collection == Guid.Empty)
+        var useSaved = saved;
+        if (Widgets.Toggle("##savedcollection", "Use a saved Penumbra collection instead", $"Fallback: the old way, with a \"{mannequinPack.Definition.Collection}\" collection you create once in Penumbra.", ref useSaved))
         {
-            ImGui.TextColored(Palette.InkDim, $"Install the {mannequinPack.Definition.Title} first.");
+            installer.UseSavedCollection(useSaved);
+        }
+
+        ImGui.Spacing();
+        var target = installer.MannequinTarget;
+        if (target.Collection == Guid.Empty)
+        {
             return;
         }
 
@@ -366,7 +379,7 @@ public sealed class ModsPage
         if (now >= nextMannequinScanUtc && installer.Penumbra.Ready)
         {
             nextMannequinScanUtc = now + MannequinScanInterval;
-            plugin.Mannequins.Scan(plugin.Penumbra, collection);
+            plugin.Mannequins.Scan(plugin.Penumbra, target);
         }
 
         var spots = plugin.Mannequins.Spots;
@@ -396,20 +409,43 @@ public sealed class ModsPage
         ImGui.Spacing();
         if (Widgets.Button("##linknow", "LINK NOW", FontAwesomeIcon.Link, new Vector2(card.InnerWidth, 34f * Widgets.Scale)))
         {
-            plugin.Mannequins.LinkAll(plugin.Penumbra, collection);
+            plugin.Mannequins.LinkAll(plugin.Penumbra, plugin.Venue, target);
         }
     }
 
-    private static PackSlot? FindMannequinPack(PackSlot[] slots)
+    private void DrawVenueCollectionStatus(PackSlot mannequinPack, bool saved)
     {
-        for (var slotIndex = 0; slotIndex < slots.Length; slotIndex++)
+        if (!mannequinPack.InPenumbra)
         {
-            if (slots[slotIndex].Definition.TargetsMannequin)
-            {
-                return slots[slotIndex];
-            }
+            ImGui.TextColored(Palette.InkDim, $"Install the {mannequinPack.Definition.Title} first.");
+            return;
         }
 
-        return null;
+        if (saved)
+        {
+            var linkedCollection = plugin.Configuration.MannequinCollectionId != Guid.Empty;
+            Widgets.IconText(linkedCollection ? FontAwesomeIcon.CheckCircle : FontAwesomeIcon.ExclamationTriangle,
+                linkedCollection ? "Saved collection found." : "Reinstall the pack to set up the saved collection.",
+                linkedCollection ? Palette.Mint : Palette.Amber);
+            return;
+        }
+
+        var venue = plugin.Venue;
+        if (venue.IsReady)
+        {
+            Widgets.IconText(FontAwesomeIcon.CheckCircle, "Venue collection is live for this session.", Palette.Mint);
+        }
+        else if (venue.IsBuilding)
+        {
+            Widgets.IconText(FontAwesomeIcon.Spinner, "Building the venue collection...", Palette.Cyan);
+        }
+        else if (venue.LastError.Length > 0)
+        {
+            Widgets.IconText(FontAwesomeIcon.ExclamationCircle, venue.LastError, Palette.Danger);
+        }
+        else
+        {
+            Widgets.IconText(FontAwesomeIcon.Clock, "The venue collection is built a moment after Penumbra is ready.", Palette.InkDim);
+        }
     }
 }

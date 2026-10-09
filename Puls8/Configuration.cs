@@ -17,6 +17,8 @@ public sealed class Configuration : IPluginConfiguration
 
     public bool RedrawAfterInstall { get; set; } = true;
 
+    public bool MannequinUsesSavedCollection { get; set; }
+
     public bool ReducedMotion { get; set; }
 
     public string StaffKey { get; set; } = string.Empty;
