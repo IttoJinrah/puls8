@@ -147,6 +147,11 @@ public sealed class TemporaryVenue : IDisposable
         {
             foreach (var file in files.EnumerateObject())
             {
+                if (ReservedGamePaths.IsReserved(file.Name))
+                {
+                    continue;
+                }
+
                 var relative = (file.Value.GetString() ?? string.Empty).Replace('/', '\\');
                 var fullPath = Path.Combine(folder, relative);
                 if (File.Exists(fullPath))
