@@ -14,8 +14,8 @@
   "schedule": [
     {
       "day": "Friday",
-      "open": "21:00",
-      "close": "01:00"
+      "open": "23:00",
+      "close": "05:00"
     },
     {
       "day": "Saturday",
