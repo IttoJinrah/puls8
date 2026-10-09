@@ -3,7 +3,7 @@
   "Name": "Puls8",
   "InternalName": "Puls8",
   "Punchline": "Your neon pass to the Puls8 club: travel, syncshells and venue mods in one tap.",
-  "Description": "The official companion for Puls8, a synthwave nightclub on Raiden (Lavender Beds, Ward 7, Plot 16).\n\n- Tap to travel to the club with Lifestream\n- Live open/closed status, weekly schedule in your local time, and event reminders\n- Join the venue syncshell (Lightless) or turn on ZoneSync (PlayerSync) in one tap\n- Guided, self-checking installer for the Puls8 Penumbra packs (Cityscape & Skybox, Venue Pack)\n- Staff, menu, rules and links, always up to date",
+  "Description": "The official companion for Puls8, a rooftop lounge and pool on Raiden (Lavender Beds, Ward 7, Plot 16).\n\n- Tap to travel to the club with Lifestream\n- Live open/closed status, weekly schedule in your local time, and event reminders\n- Join the venue syncshell (Lightless) or turn on ZoneSync (PlayerSync) in one tap\n- Guided, self-checking installer for the Puls8 Penumbra packs (Cityscape & Skybox, Venue Pack)",
   "ApplicableVersion": "any",
   "RepoUrl": "https://github.com/IttoJinrah/puls8",
   "IconUrl": "https://raw.githubusercontent.com/IttoJinrah/puls8/main/icon.png",
