@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Puls8.Venue;
 
 public sealed class VenueProfile
@@ -37,6 +39,7 @@ public sealed class VenueAddress
 
     public int Plot { get; init; }
 
+    [JsonIgnore]
     public string Display => $"{World} · {District} · Ward {Ward} · Plot {Plot}";
 }
 
@@ -63,6 +66,7 @@ public sealed class VenueEvent
 
     public string Blurb { get; init; } = string.Empty;
 
+    [JsonIgnore]
     public DateTimeOffset Ends => Starts.AddMinutes(Minutes);
 }
 
@@ -108,5 +112,6 @@ public sealed class PackDefinition
 
     public bool AllOptions { get; init; }
 
+    [JsonIgnore]
     public bool TargetsMannequin => string.Equals(Target, "mannequin", StringComparison.OrdinalIgnoreCase);
 }
