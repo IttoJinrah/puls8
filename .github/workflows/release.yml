@@ -1,0 +1,110 @@
+name: Release plugin
+
+# Plugin releases use plugin-v* tags so they never collide with the mod-v* and venue_pack-v* pack releases.
+# repo.json pins the exact tag instead of releases/latest, because a newer pack release would otherwise
+# become "latest" and break plugin downloads.
+on:
+  push:
+    tags:
+      - 'plugin-v*.*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release, e.g. plugin-v1.0.0.0'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Resolve tag
+        id: tag
+        shell: bash
+        run: |
+          target="${{ inputs.tag }}"
+          [ -z "$target" ] && target="${{ github.ref_name }}"
+          if [[ ! "$target" =~ ^plugin-v[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::'$target' is not a plugin-vX.Y.Z.W tag."
+            exit 1
+          fi
+          echo "target=$target" >> "$GITHUB_OUTPUT"
+          echo "version=${target#plugin-v}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.target }}
+          fetch-depth: 0
+
+      - name: Tag matches the project version
+        shell: bash
+        run: |
+          build_ver=$(grep -oP '<Version>\K[\d.]+(?=</Version>)' Directory.Build.props)
+          if [ "$build_ver" != "${{ steps.tag.outputs.version }}" ]; then
+            echo "::error::Tag says ${{ steps.tag.outputs.version }} but Directory.Build.props says $build_ver."
+            exit 1
+          fi
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download Dalamud dev build
+        shell: pwsh
+        run: |
+          $dir = "$env:AppData\XIVLauncher\addon\Hooks\dev"
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile dalamud.zip
+          Expand-Archive -Path dalamud.zip -DestinationPath $dir -Force
+
+      - name: Build
+        run: dotnet build Puls8.sln -c Release
+
+      - name: Stage Puls8.zip
+        shell: pwsh
+        run: Copy-Item 'Puls8/bin/x64/Release/Puls8/latest.zip' 'Puls8.zip' -Force
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.target }}
+          name: Puls8 ${{ steps.tag.outputs.version }}
+          files: Puls8.zip
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          make_latest: false
+
+      - name: Point repo.json at this release
+        shell: pwsh
+        run: |
+          $version = '${{ steps.tag.outputs.version }}'
+          $url = 'https://github.com/${{ github.repository }}/releases/download/${{ steps.tag.outputs.target }}/Puls8.zip'
+          $json = Get-Content -Raw repo.json | ConvertFrom-Json
+          $json[0].AssemblyVersion = $version
+          $json[0].TestingAssemblyVersion = $version
+          $json[0].DownloadLinkInstall = $url
+          $json[0].DownloadLinkTesting = $url
+          $json[0].DownloadLinkUpdate = $url
+          $json[0] | Add-Member -NotePropertyName LastUpdate -NotePropertyValue ([string][DateTimeOffset]::UtcNow.ToUnixTimeSeconds()) -Force
+          ConvertTo-Json -InputObject $json -Depth 10 -AsArray | Set-Content -Path repo.json -Encoding utf8
+
+      - name: Commit repo.json to main
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add repo.json
+          if (-not (git status --porcelain)) { exit 0 }
+          git commit -m "Release ${{ steps.tag.outputs.target }}: update repo.json"
+          for ($attempt = 1; $attempt -le 5; $attempt++) {
+            git fetch origin main
+            git rebase -X theirs origin/main
+            if ($LASTEXITCODE -ne 0) { git rebase --abort; Start-Sleep -Seconds 2; continue }
+            git push origin HEAD:main
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            Start-Sleep -Seconds 2
+          }
+          exit 1

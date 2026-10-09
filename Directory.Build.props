@@ -1,0 +1,23 @@
+<Project>
+
+  <!--
+    The version must have four parts: the SDK stamps the shipped manifest from the
+    assembly version, and Dalamud refuses the install when repo.json differs.
+    CI asserts this value matches repo.json.
+  -->
+
+  <PropertyGroup Label="Identity">
+    <Version>1.0.0.0</Version>
+    <Authors>Arka &amp; XeldarAlz</Authors>
+    <Copyright>Copyright (c) Arka &amp; XeldarAlz</Copyright>
+    <PackageProjectUrl>https://github.com/IttoJinrah/puls8</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/IttoJinrah/puls8</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Determinism" Condition="'$(GITHUB_ACTIONS)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+</Project>

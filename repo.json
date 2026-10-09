@@ -1,18 +1,21 @@
 [
-    {
-          "Author": "Arka",
-          "Name": "Puls8",
-          "InternalName": "Puls8",
-          "AssemblyVersion": "0.1.0.2",
-          "Description": "Panel and mod updater for the Puls8 venue.",
-          "Punchline": "Panel and mod updater for the Puls8 venue.",
-          "ApplicableVersion": "any",
-          "RepoUrl": "https://github.com/IttoJinrah/puls8",
-          "Tags": ["venue", "roleplay", "penumbra"],
-          "DalamudApiLevel": 15,
-          "IconUrl": "https://raw.githubusercontent.com/IttoJinrah/puls8/main/pulse_logo.png",
-          "DownloadLinkInstall": "https://github.com/IttoJinrah/puls8/releases/download/plugin-v1.3/Puls8.zip",
-          "DownloadLinkTesting": "https://github.com/IttoJinrah/puls8/releases/download/plugin-v1.3/Puls8.zip",
-          "DownloadLinkUpdate": "https://github.com/IttoJinrah/puls8/releases/download/plugin-v1.3/Puls8.zip"
-    }
+  {
+    "Author": "Arka & XeldarAlz",
+    "Name": "Puls8",
+    "InternalName": "Puls8",
+    "AssemblyVersion": "1.0.0.0",
+    "TestingAssemblyVersion": "1.0.0.0",
+    "Punchline": "Your neon pass to the Puls8 club: travel, syncshells and venue mods in one tap.",
+    "Description": "The official companion for Puls8, a synthwave nightclub on Raiden (Lavender Beds, Ward 7, Plot 16).\n\n- Tap to travel to the club with Lifestream\n- Live open/closed status, weekly schedule in your local time, and event reminders\n- Join the venue syncshell (Lightless) or turn on ZoneSync (PlayerSync) in one tap\n- Guided, self-checking installer for the Puls8 Penumbra packs (Cityscape & Skybox, Venue Pack)\n- Staff, menu, rules and links, always up to date",
+    "ApplicableVersion": "any",
+    "RepoUrl": "https://github.com/IttoJinrah/puls8",
+    "Tags": ["venue", "club", "roleplay", "penumbra", "lifestream", "syncshell"],
+    "DalamudApiLevel": 15,
+    "LoadPriority": 0,
+    "IconUrl": "https://raw.githubusercontent.com/IttoJinrah/puls8/main/icon.png",
+    "ImageUrls": [],
+    "DownloadLinkInstall": "https://github.com/IttoJinrah/puls8/releases/download/plugin-v1.0.0.0/Puls8.zip",
+    "DownloadLinkTesting": "https://github.com/IttoJinrah/puls8/releases/download/plugin-v1.0.0.0/Puls8.zip",
+    "DownloadLinkUpdate": "https://github.com/IttoJinrah/puls8/releases/download/plugin-v1.0.0.0/Puls8.zip"
+  }
 ]

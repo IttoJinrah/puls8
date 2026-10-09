@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  guards:
+    name: Guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version sync (Directory.Build.props and repo.json)
+        shell: bash
+        run: |
+          build_ver=$(grep -oP '<Version>\K[\d.]+(?=</Version>)' Directory.Build.props)
+          assembly_ver=$(jq -r '.[0].AssemblyVersion' repo.json)
+          testing_ver=$(jq -r '.[0].TestingAssemblyVersion' repo.json)
+          if [[ ! "$build_ver" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Directory.Build.props <Version> ($build_ver) must have four parts; Dalamud rejects installs when repo.json differs from the padded assembly version."
+            exit 1
+          fi
+          if [ "$build_ver" != "$assembly_ver" ] || [ "$build_ver" != "$testing_ver" ]; then
+            echo "::error::Version mismatch: props $build_ver, repo.json $assembly_ver / $testing_ver."
+            exit 1
+          fi
+
+      - name: venue.json is valid and its pack folders are safe
+        shell: bash
+        run: |
+          jq empty venue.json
+          bad=$(jq -r '.packs[] | select((.folder | test("^Puls8_[A-Za-z0-9_]{1,48}$") | not) or (.tagPrefix | length) == 0) | .id' venue.json)
+          if [ -n "$bad" ]; then
+            echo "::error::venue.json packs with an unsafe folder or empty tagPrefix: $bad. The plugin ignores the whole file when this happens."
+            exit 1
+          fi
+
+      - name: Icon fits Dalamud's 512x512 limit
+        shell: bash
+        run: |
+          size=$(python3 -c "import struct;d=open('icon.png','rb').read(24);print(*struct.unpack('>II',d[16:24]))")
+          read w h <<< "$size"
+          if [ "$w" -gt 512 ] || [ "$h" -gt 512 ] || [ "$w" -ne "$h" ]; then
+            echo "::error::icon.png is ${w}x${h}; Dalamud silently drops icons that are not square or exceed 512x512."
+            exit 1
+          fi
+
+  build:
+    name: Build
+    needs: guards
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download Dalamud dev build
+        shell: pwsh
+        run: |
+          $dir = "$env:AppData\XIVLauncher\addon\Hooks\dev"
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile dalamud.zip
+          Expand-Archive -Path dalamud.zip -DestinationPath $dir -Force
+
+      - name: Build
+        run: dotnet build Puls8.sln -c Release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Puls8
+          path: Puls8/bin/x64/Release/Puls8/latest.zip
