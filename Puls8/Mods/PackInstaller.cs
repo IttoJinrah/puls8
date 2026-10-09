@@ -379,7 +379,7 @@ public sealed class PackInstaller : IDisposable
             penumbra.RedrawEverything();
         }
 
-        if (!sceneryChanged)
+        if (!sceneryChanged || PenumbraBridge.RedrawFurniture())
         {
             return;
         }
@@ -413,13 +413,34 @@ public sealed class PackInstaller : IDisposable
 
     private PenumbraApiEc EnableAndVerify(Guid collection, PackDefinition definition)
     {
-        var code = penumbra.Enable(collection, definition.Folder, definition.Priority);
+        var code = EnableIn(collection, definition);
         if (code != PenumbraApiEc.Success)
         {
             return code;
         }
 
-        return penumbra.IsEnabled(collection, definition.Folder) ? PenumbraApiEc.Success : PenumbraApiEc.UnknownError;
+        // Scenery packs belong in Base, but players read Penumbra's mod list for their own collection; mirror it there too.
+        if (!definition.TargetsMannequin)
+        {
+            var player = penumbra.PlayerCollection();
+            if (player != Guid.Empty && player != collection)
+            {
+                EnableIn(player, definition);
+            }
+        }
+
+        return penumbra.IsEnabled(collection, definition.Folder, definition.AllOptions) ? PenumbraApiEc.Success : PenumbraApiEc.UnknownError;
+    }
+
+    private PenumbraApiEc EnableIn(Guid collection, PackDefinition definition)
+    {
+        var code = penumbra.Enable(collection, definition.Folder, definition.Priority);
+        if (code == PenumbraApiEc.Success && definition.AllOptions)
+        {
+            penumbra.EnableEveryMultiOption(collection, definition.Folder);
+        }
+
+        return code;
     }
 
     private int LinkIfAtVenue(Guid collection)
@@ -443,7 +464,7 @@ public sealed class PackInstaller : IDisposable
             slot.InPenumbra = Penumbra.Ready && penumbra.HasMod(slot.Definition.Folder);
             AdoptExistingMannequinCollection(slot);
             var collection = slot.Definition.TargetsMannequin ? configuration.MannequinCollectionId : baseCollection?.Id ?? Guid.Empty;
-            slot.Enabled = slot.InPenumbra && collection != Guid.Empty && penumbra.IsEnabled(collection, slot.Definition.Folder);
+            slot.Enabled = slot.InPenumbra && collection != Guid.Empty && penumbra.IsEnabled(collection, slot.Definition.Folder, slot.Definition.AllOptions);
             if (slot.Problem is not null && !slot.NeedsAttention)
             {
                 slot.Problem = null;

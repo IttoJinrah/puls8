@@ -135,5 +135,7 @@ public sealed class PackDefinition
 
     public int Priority { get; init; } = 100;
 
+    public bool AllOptions { get; init; }
+
     public bool TargetsMannequin => string.Equals(Target, "mannequin", StringComparison.OrdinalIgnoreCase);
 }

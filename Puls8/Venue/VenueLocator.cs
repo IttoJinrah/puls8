@@ -14,6 +14,12 @@ public static class VenueLocator
     private static string cachedWorldName = string.Empty;
     private static uint cachedWorldId;
 
+    public static unsafe bool IsIndoors()
+    {
+        var housing = HousingManager.Instance();
+        return housing is not null && housing->IsInside();
+    }
+
     public static unsafe bool IsInside(VenueAddress address)
     {
         var housing = HousingManager.Instance();

@@ -29,6 +29,8 @@ public sealed class PenumbraBridge : IDisposable
     private readonly TrySetMod trySetMod;
     private readonly TrySetModPriority trySetModPriority;
     private readonly GetCurrentModSettings getCurrentModSettings;
+    private readonly GetAvailableModSettings getAvailableModSettings;
+    private readonly TrySetModSettings trySetModSettings;
     private readonly RedrawObject redrawObject;
     private readonly RedrawAll redrawAll;
     private readonly OpenMainWindow openMainWindow;
@@ -51,6 +53,8 @@ public sealed class PenumbraBridge : IDisposable
         trySetMod = new TrySetMod(pluginInterface);
         trySetModPriority = new TrySetModPriority(pluginInterface);
         getCurrentModSettings = new GetCurrentModSettings(pluginInterface);
+        getAvailableModSettings = new GetAvailableModSettings(pluginInterface);
+        trySetModSettings = new TrySetModSettings(pluginInterface);
         redrawObject = new RedrawObject(pluginInterface);
         redrawAll = new RedrawAll(pluginInterface);
         openMainWindow = new OpenMainWindow(pluginInterface);
@@ -139,17 +143,84 @@ public sealed class PenumbraBridge : IDisposable
         return prioritized is PenumbraApiEc.NothingChanged ? PenumbraApiEc.Success : prioritized;
     }
 
-    public bool IsEnabled(Guid collection, string folder)
+    public bool IsEnabled(Guid collection, string folder, bool allOptions = false)
     {
         try
         {
             var (code, settings) = getCurrentModSettings.Invoke(collection, folder, string.Empty, true);
-            return code == PenumbraApiEc.Success && settings is { Item1: true };
+            if (code != PenumbraApiEc.Success || settings is not { Item1: true } current)
+            {
+                return false;
+            }
+
+            return !allOptions || HasEveryMultiOption(folder, current.Item3);
         }
         catch (IpcError)
         {
             return false;
         }
+    }
+
+    // Single-choice groups can only hold one option, so "all options" means every option of every multi-choice group.
+    public void EnableEveryMultiOption(Guid collection, string folder)
+    {
+        var groups = getAvailableModSettings.Invoke(folder);
+        if (groups is null)
+        {
+            return;
+        }
+
+        foreach (var (groupName, (options, type)) in groups)
+        {
+            if (type != GroupType.Multi || options.Length == 0)
+            {
+                continue;
+            }
+
+            var code = trySetModSettings.Invoke(collection, folder, groupName, options);
+            if (code is not (PenumbraApiEc.Success or PenumbraApiEc.NothingChanged))
+            {
+                Services.Log.Warning($"Penumbra answered {code} turning on the '{groupName}' options of {folder}");
+            }
+        }
+    }
+
+    // The collection actually drawn on the local player, which is what players look at in Penumbra's mod list.
+    public Guid PlayerCollection()
+    {
+        try
+        {
+            var (valid, _, effective) = getCollectionForObject.Invoke(0);
+            return valid ? effective.Id : Guid.Empty;
+        }
+        catch (IpcError)
+        {
+            return Guid.Empty;
+        }
+    }
+
+    private bool HasEveryMultiOption(string folder, Dictionary<string, List<string>> enabled)
+    {
+        var groups = getAvailableModSettings.Invoke(folder);
+        if (groups is null)
+        {
+            return true;
+        }
+
+        foreach (var (groupName, (options, type)) in groups)
+        {
+            if (type != GroupType.Multi)
+            {
+                continue;
+            }
+
+            if (!enabled.TryGetValue(groupName, out var chosen) || chosen.Count < options.Length)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public ObjectCollection CollectionFor(int objectIndex)
@@ -166,7 +237,18 @@ public sealed class PenumbraBridge : IDisposable
 
     public void Redraw(int objectIndex) => redrawObject.Invoke(objectIndex);
 
-    // Redraws characters only (players, NPCs, mannequins); housing furniture reloads with the zone, not with a redraw.
+    // Penumbra exposes furniture redraws only through its chat command, and only indoors.
+    public static bool RedrawFurniture()
+    {
+        if (!Venue.VenueLocator.IsIndoors() || !Services.Commands.Commands.ContainsKey("/penumbra"))
+        {
+            return false;
+        }
+
+        return Services.Commands.ProcessCommand("/penumbra redraw furniture");
+    }
+
+    // Redraws characters only (players, NPCs, mannequins); furniture needs RedrawFurniture.
     public bool RedrawEverything()
     {
         try

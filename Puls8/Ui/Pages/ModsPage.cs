@@ -100,9 +100,10 @@ public sealed class ModsPage
         }
 
         ImGui.SameLine(0f, gap);
-        if (Widgets.IconButton("##modsredraw", FontAwesomeIcon.Magic, size, "Redraw everyone now", Palette.Violet) && installer.Penumbra.Ready)
+        if (Widgets.IconButton("##modsredraw", FontAwesomeIcon.Magic, size, "Redraw everyone, and the furniture when you're indoors", Palette.Violet) && installer.Penumbra.Ready)
         {
             plugin.Penumbra.RedrawEverything();
+            PenumbraBridge.RedrawFurniture();
         }
 
         ImGui.SetCursorScreenPos(origin);

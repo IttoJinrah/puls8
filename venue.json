@@ -86,7 +86,8 @@
       "tagPrefix": "venue_pack-v",
       "folder": "Puls8_VenuePack",
       "target": "base",
-      "priority": 100
+      "priority": 100,
+      "allOptions": true
     }
   ]
 }
