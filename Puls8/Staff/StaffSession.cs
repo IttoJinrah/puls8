@@ -173,7 +173,7 @@ public sealed class StaffSession
         try
         {
             var json = Draft.ToJsonString(WriteOptions) + "\n";
-            var message = $"Update venue info via the Puls8 staff editor ({Login})";
+            var message = $"Update venue info ({Login})";
             var result = await GitHubContents.PublishAsync(key, json, sha, message).ConfigureAwait(false);
             switch (result.Outcome)
             {
