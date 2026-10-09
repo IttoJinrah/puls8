@@ -97,6 +97,22 @@ public sealed class AboutPage
             configuration.NotifyPackUpdates = notify;
             configuration.Save();
         }
+
+        ImGui.Spacing();
+        var redraw = configuration.RedrawAfterInstall;
+        if (Widgets.Toggle("##redrawafter", "Redraw everyone after installing", "Venue mods show up without a relog.", ref redraw))
+        {
+            configuration.RedrawAfterInstall = redraw;
+            configuration.Save();
+        }
+
+        ImGui.Spacing();
+        var autoLink = configuration.AutoLinkMannequins;
+        if (Widgets.Toggle("##autolink", "Link the mannequin automatically", "Puts the Cityscape on the club's mannequin when you walk in.", ref autoLink))
+        {
+            configuration.AutoLinkMannequins = autoLink;
+            configuration.Save();
+        }
     }
 
     private void DrawFeed()

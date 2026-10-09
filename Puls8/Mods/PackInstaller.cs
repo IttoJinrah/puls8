@@ -30,6 +30,11 @@ public sealed class PackSlot
     public bool IsWorking => Progress.Stage is not (InstallStage.Idle or InstallStage.Done or InstallStage.Failed);
 
     public bool NeedsInstall => !InPenumbra || Record is null || (Latest is not null && !string.Equals(Record.Tag, Latest.Tag, StringComparison.Ordinal));
+
+    // Files are current but the pack isn't switched on: finishing setup needs no download.
+    public bool NeedsSetup => !NeedsInstall && !Enabled;
+
+    public bool NeedsAttention => NeedsInstall || !Enabled;
 }
 
 public sealed class PackInstaller : IDisposable
@@ -75,7 +80,7 @@ public sealed class PackInstaller : IDisposable
             var pending = 0;
             for (var slotIndex = 0; slotIndex < slots.Length; slotIndex++)
             {
-                if (slots[slotIndex].NeedsInstall)
+                if (slots[slotIndex].NeedsAttention)
                 {
                     pending++;
                 }
@@ -206,12 +211,13 @@ public sealed class PackInstaller : IDisposable
             for (var slotIndex = 0; slotIndex < current.Length; slotIndex++)
             {
                 var slot = current[slotIndex];
-                if (only is not null ? !ReferenceEquals(slot, only) : !slot.NeedsInstall)
+                if (only is not null ? !ReferenceEquals(slot, only) : !slot.NeedsAttention)
                 {
                     continue;
                 }
 
-                var succeeded = await InstallSlotAsync(slot, token).ConfigureAwait(false);
+                var download = only is not null || slot.NeedsInstall;
+                var succeeded = await InstallSlotAsync(slot, download, token).ConfigureAwait(false);
                 if (!succeeded || token.IsCancellationRequested)
                 {
                     break;
@@ -233,7 +239,7 @@ public sealed class PackInstaller : IDisposable
         }
     }
 
-    private async Task<bool> InstallSlotAsync(PackSlot slot, CancellationToken token)
+    private async Task<bool> InstallSlotAsync(PackSlot slot, bool download, CancellationToken token)
     {
         var definition = slot.Definition;
         var progress = slot.Progress;
@@ -252,20 +258,24 @@ public sealed class PackInstaller : IDisposable
             }
 
             var collection = await PenumbraBridge.OnFramework(() => ResolveCollection(definition)).ConfigureAwait(false);
-            await catalog.RefreshAsync(token).ConfigureAwait(false);
-            var release = catalog.Find(definition) ?? throw new InstallException(Problems.NoRelease);
-            slot.Latest = release;
-            PackFiles.EnsureDiskSpace(state.ModDirectory, release.Size);
+            PackRelease? release = null;
+            if (download)
+            {
+                await catalog.RefreshAsync(token).ConfigureAwait(false);
+                release = catalog.Find(definition) ?? throw new InstallException(Problems.NoRelease);
+                slot.Latest = release;
+                PackFiles.EnsureDiskSpace(state.ModDirectory, release.Size);
 
-            archive = await PackDownloader.DownloadAsync(release, progress, token).ConfigureAwait(false);
-            staging = PackFiles.StagingDirectory(state.ModDirectory);
-            var stagingPath = staging;
-            var archivePath = archive;
-            await Task.Run(() => PackFiles.Extract(archivePath, stagingPath, progress), token).ConfigureAwait(false);
+                archive = await PackDownloader.DownloadAsync(release, progress, token).ConfigureAwait(false);
+                staging = PackFiles.StagingDirectory(state.ModDirectory);
+                var stagingPath = staging;
+                var archivePath = archive;
+                await Task.Run(() => PackFiles.Extract(archivePath, stagingPath, progress), token).ConfigureAwait(false);
 
-            progress.Stage = InstallStage.Swapping;
-            await SwapAsync(definition.Folder, state.ModDirectory, staging, token).ConfigureAwait(false);
-            staging = null;
+                progress.Stage = InstallStage.Swapping;
+                await SwapAsync(definition.Folder, state.ModDirectory, staging, token).ConfigureAwait(false);
+                staging = null;
+            }
 
             progress.Stage = InstallStage.Registering;
             var registered = await PenumbraBridge.OnFramework(() => Register(definition.Folder)).ConfigureAwait(false);
@@ -290,10 +300,14 @@ public sealed class PackInstaller : IDisposable
                 await PenumbraBridge.OnFramework(() => LinkIfAtVenue(collection)).ConfigureAwait(false);
             }
 
-            var record = new InstalledPack { Tag = release.Tag, Digest = release.Sha256, InstalledUtc = DateTime.UtcNow };
-            configuration.Packs[definition.Id] = record;
+            if (release is not null)
+            {
+                var record = new InstalledPack { Tag = release.Tag, Digest = release.Sha256, InstalledUtc = DateTime.UtcNow };
+                configuration.Packs[definition.Id] = record;
+                slot.Record = record;
+            }
+
             configuration.Save();
-            slot.Record = record;
             progress.Stage = InstallStage.Done;
             return true;
         }
@@ -430,6 +444,11 @@ public sealed class PackInstaller : IDisposable
             AdoptExistingMannequinCollection(slot);
             var collection = slot.Definition.TargetsMannequin ? configuration.MannequinCollectionId : baseCollection?.Id ?? Guid.Empty;
             slot.Enabled = slot.InPenumbra && collection != Guid.Empty && penumbra.IsEnabled(collection, slot.Definition.Folder);
+            if (slot.Problem is not null && !slot.NeedsAttention)
+            {
+                slot.Problem = null;
+                slot.Progress.Reset();
+            }
         }
     }
 

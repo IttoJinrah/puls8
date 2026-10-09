@@ -2,10 +2,10 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Penumbra.Api.Enums;
 using Puls8.Mods;
-using Puls8.Venue;
 
 namespace Puls8.Ui.Pages;
 
+// One status card that only offers a button when something needs doing, a quiet list, and everything else folded away.
 public sealed class ModsPage
 {
     private static readonly string[] BaseSteps = ["CHECK", "DOWNLOAD", "UNPACK", "SWAP", "REGISTER", "ENABLE"];
@@ -14,6 +14,7 @@ public sealed class ModsPage
 
     private readonly Plugin plugin;
     private DateTime nextMannequinScanUtc;
+    private bool advancedOpen;
 
     public ModsPage(Plugin plugin)
     {
@@ -32,106 +33,50 @@ public sealed class ModsPage
     {
         var installer = plugin.Installer;
         Widgets.SectionTitle("VENUE MODS", 81);
-        Widgets.Wrapped("The club's skyline, pool and decor are Penumbra mods. Install them once and Puls8 keeps them current; every step is checked, so if something goes wrong you'll see exactly what and how to fix it.", Palette.InkMuted);
-        ImGui.Spacing();
-
-        DrawPenumbraStatus(installer);
-        DrawPrimaryAction(installer);
-        DrawApply(installer);
-        var slots = installer.Slots;
-        for (var slotIndex = 0; slotIndex < slots.Length; slotIndex++)
-        {
-            DrawPack(installer, slots[slotIndex], slotIndex);
-        }
-
-        DrawMannequins(installer);
+        DrawStatus(installer);
+        DrawList(installer);
+        DrawAdvanced(installer);
     }
 
-    private void DrawPenumbraStatus(PackInstaller installer)
+    private void DrawStatus(PackInstaller installer)
     {
-        var state = installer.Penumbra;
-        if (installer.IsChecking && !state.Ready)
-        {
-            using var checking = Widgets.Card(Palette.Violet);
-            Widgets.IconText(FontAwesomeIcon.Spinner, "Checking Penumbra and the latest releases...", Palette.Cyan);
-            return;
-        }
-
-        if (state.Blocking is not null)
-        {
-            DrawProblem(state.Blocking, null);
-            return;
-        }
-
-        if (installer.CatalogProblem is not null)
-        {
-            DrawProblem(installer.CatalogProblem, null);
-        }
-
-        if (state.Warning is not null)
-        {
-            DrawProblem(state.Warning, null);
-        }
-
-        if (!state.Ready)
-        {
-            return;
-        }
-
-        using var card = Widgets.Card(Palette.Mint);
-        Widgets.IconText(FontAwesomeIcon.CheckCircle, "Penumbra is ready", Palette.Mint);
-        ImGui.TextColored(Palette.InkDim, $"Mod folder: {state.ModDirectory}");
-    }
-
-    private void DrawPrimaryAction(PackInstaller installer)
-    {
-        var scale = Widgets.Scale;
-        var width = ImGui.GetContentRegionAvail().X;
+        var working = FindWorking(installer.Slots);
+        var problem = installer.Penumbra.Blocking ?? installer.CatalogProblem;
+        var problemSlot = problem is null ? FindProblem(installer.Slots) : null;
+        problem ??= problemSlot?.Problem;
         var pending = installer.PendingCount;
-        var size = new Vector2(width, 50f * scale);
-        using (Fonts.Label())
+        var accent = working is not null ? Palette.Cyan : problem is not null ? Palette.Danger : pending > 0 ? Palette.Magenta : Palette.Mint;
+
+        using var card = Widgets.Card(accent);
+        DrawCornerButtons(installer, card.InnerWidth);
+
+        if (working is not null)
         {
-            if (installer.IsBusy)
-            {
-                if (Widgets.Button("##cancelall", "INSTALLING... TAP TO CANCEL", FontAwesomeIcon.Stop, size, ButtonTone.Ghost))
-                {
-                    installer.Cancel();
-                }
-            }
-            else if (pending > 0)
-            {
-                var ready = installer.Penumbra.Ready;
-                var label = pending == 1 ? "INSTALL 1 PACK" : $"INSTALL {pending} PACKS";
-                if (Widgets.Button("##installall", label, FontAwesomeIcon.Download, size, ButtonTone.Primary, ready))
-                {
-                    installer.InstallAll();
-                }
-            }
-            else
-            {
-                Widgets.Button("##uptodate", "EVERYTHING IS UP TO DATE", FontAwesomeIcon.CheckDouble, size, ButtonTone.Ghost, false);
-            }
+            DrawWorking(installer, working, card.InnerWidth);
+        }
+        else if (problem is not null)
+        {
+            DrawProblem(problem, problemSlot, card.InnerWidth);
+        }
+        else if (installer.IsChecking && !installer.Penumbra.Ready)
+        {
+            Headline("Checking...", Palette.Cyan);
+            ImGui.TextColored(Palette.InkDim, "Looking at Penumbra and the latest releases.");
+        }
+        else if (pending > 0)
+        {
+            DrawPending(installer, pending, card.InnerWidth);
+        }
+        else
+        {
+            Headline("All set", Palette.Mint);
+            ImGui.TextColored(Palette.InkDim, "Every venue pack is installed, current and switched on.");
         }
 
-        ImGui.Spacing();
-        var checkLabel = installer.IsChecking ? "CHECKING..." : "CHECK FOR UPDATES";
-        if (Widgets.Button("##check", checkLabel, FontAwesomeIcon.SyncAlt, new Vector2(width, 30f * scale), ButtonTone.Ghost, !installer.IsChecking && !installer.IsBusy))
+        if (installer.Penumbra.Warning is { } warning && working is null)
         {
-            _ = installer.CheckAsync(false);
-        }
-
-        ImGui.Spacing();
-    }
-
-    private void DrawApply(PackInstaller installer)
-    {
-        var configuration = plugin.Configuration;
-        using var card = Widgets.Card(Palette.Cyan);
-        var redraw = configuration.RedrawAfterInstall;
-        if (Widgets.Toggle("##redrawafter", "Refresh everything after installing", "Packs are switched on automatically; this also redraws everyone so changes show without a relog.", ref redraw))
-        {
-            configuration.RedrawAfterInstall = redraw;
-            configuration.Save();
+            ImGui.Spacing();
+            Widgets.IconText(FontAwesomeIcon.ExclamationTriangle, warning.Title, Palette.Amber);
         }
 
         if (installer.NeedsZoneReload)
@@ -139,120 +84,311 @@ public sealed class ModsPage
             ImGui.Spacing();
             Widgets.IconText(FontAwesomeIcon.DoorOpen, "Step outside and back in to load the new furniture and pool.", Palette.Amber);
         }
+    }
 
-        ImGui.Spacing();
-        if (Widgets.Button("##redrawnow", "REDRAW NOW", FontAwesomeIcon.SyncAlt, new Vector2(card.InnerWidth, 30f * Widgets.Scale), ButtonTone.Ghost, installer.Penumbra.Ready && !installer.IsBusy))
+    private void DrawCornerButtons(PackInstaller installer, float innerWidth)
+    {
+        var scale = Widgets.Scale;
+        var size = 26f * scale;
+        var gap = 6f * scale;
+        var origin = ImGui.GetCursorScreenPos();
+        ImGui.SetCursorScreenPos(new Vector2(origin.X + innerWidth - size * 2f - gap, origin.Y));
+        if (Widgets.IconButton("##modscheck", FontAwesomeIcon.SyncAlt, size, installer.IsChecking ? "Checking..." : "Check for updates", Palette.Cyan)
+            && !installer.IsChecking && !installer.IsBusy)
+        {
+            _ = installer.CheckAsync(false);
+        }
+
+        ImGui.SameLine(0f, gap);
+        if (Widgets.IconButton("##modsredraw", FontAwesomeIcon.Magic, size, "Redraw everyone now", Palette.Violet) && installer.Penumbra.Ready)
         {
             plugin.Penumbra.RedrawEverything();
         }
 
-        ImGui.TextColored(Palette.InkDim, "Redraw refreshes characters and the mannequin. Furniture reloads when you re-enter the house.");
+        ImGui.SetCursorScreenPos(origin);
     }
 
-    private void DrawPack(PackInstaller installer, PackSlot slot, int index)
+    private static void DrawWorking(PackInstaller installer, PackSlot slot, float width)
     {
-        var definition = slot.Definition;
         var progress = slot.Progress;
-        var accent = slot.Problem is not null ? Palette.Danger : slot.NeedsInstall ? Palette.Magenta : Palette.Mint;
-        using var card = Widgets.Card(accent);
-        using (Fonts.Label())
-        {
-            ImGui.TextColored(Palette.Core, definition.Title.ToUpperInvariant());
-        }
-
-        ImGui.SameLine(0f, 10f * Widgets.Scale);
-        DrawPackChip(slot);
-        Widgets.Wrapped(definition.Blurb, Palette.InkMuted);
+        Headline(progress.ReachedStage <= InstallStage.Checking ? $"Preparing {slot.Definition.Title}" : $"Installing {slot.Definition.Title}", Palette.Cyan);
         ImGui.Spacing();
-        DrawVersions(slot);
-
-        var steps = definition.TargetsMannequin ? MannequinSteps : BaseSteps;
-        if (slot.IsWorking || progress.Stage is InstallStage.Done or InstallStage.Failed)
-        {
-            ImGui.Spacing();
-            var active = progress.Stage == InstallStage.Done ? steps.Length : StepIndex(progress.ReachedStage);
-            Widgets.Steps(steps, active, progress.Stage == InstallStage.Failed);
-        }
-
+        Widgets.Steps(slot.Definition.TargetsMannequin ? MannequinSteps : BaseSteps, StepIndex(progress.ReachedStage), false);
         if (progress.Stage is InstallStage.Downloading or InstallStage.Unpacking)
         {
             var caption = progress.Stage == InstallStage.Downloading
                 ? $"{Format.Bytes(progress.BytesDone)} of {Format.Bytes(progress.BytesTotal)}"
                 : "Unpacking files...";
-            Widgets.Progress(progress.Fraction, card.InnerWidth, caption);
+            Widgets.Progress(progress.Fraction, width, caption);
         }
 
-        if (slot.Problem is not null)
+        ImGui.Spacing();
+        if (Widgets.Button("##cancelinstall", "CANCEL", FontAwesomeIcon.Stop, new Vector2(width, 28f * Widgets.Scale), ButtonTone.Ghost))
         {
-            ImGui.Spacing();
-            DrawProblemBody(slot.Problem, slot, card.InnerWidth);
-            return;
+            installer.Cancel();
         }
+    }
 
-        if (progress.Stage == InstallStage.Done)
+    private void DrawPending(PackInstaller installer, int pending, float width)
+    {
+        var slots = installer.Slots;
+        var setupOnly = true;
+        long downloadBytes = 0;
+        for (var slotIndex = 0; slotIndex < slots.Length; slotIndex++)
         {
-            Widgets.IconText(FontAwesomeIcon.CheckCircle, "Installed, enabled and verified.", Palette.Mint);
+            var slot = slots[slotIndex];
+            if (!slot.NeedsInstall)
+            {
+                continue;
+            }
+
+            setupOnly = false;
+            downloadBytes += slot.Latest?.Size ?? 0;
         }
 
-        if (slot.IsWorking || installer.IsBusy)
+        var firstName = FindAttention(slots)?.Definition.Title ?? "A pack";
+        var title = setupOnly
+            ? pending == 1 ? $"{firstName} needs setup" : $"{pending} packs need setup"
+            : pending == 1 ? $"{firstName} is ready to install" : $"{pending} packs are ready to install";
+        Headline(title, Palette.Core);
+        ImGui.TextColored(Palette.InkDim, setupOnly ? "No download needed, it only takes a moment." : $"About {Format.Bytes(downloadBytes)} to download.");
+        ImGui.Spacing();
+        var label = setupOnly ? "FINISH SETUP" : "INSTALL";
+        using (Fonts.Label())
+        {
+            if (Widgets.Button("##installall", label, setupOnly ? FontAwesomeIcon.Check : FontAwesomeIcon.Download, new Vector2(width, 44f * Widgets.Scale), ButtonTone.Primary, installer.Penumbra.Ready && !installer.IsBusy))
+            {
+                installer.InstallAll();
+            }
+        }
+    }
+
+    private void DrawProblem(Problem problem, PackSlot? slot, float width)
+    {
+        Headline(problem.Title, problem.Severity == ProblemSeverity.Warning ? Palette.Amber : Palette.Danger);
+        Widgets.Wrapped(problem.Detail, Palette.InkMuted);
+        if (problem.Fix == FixAction.None)
         {
             return;
         }
 
         ImGui.Spacing();
-        var label = !slot.InPenumbra ? "INSTALL" : slot.NeedsInstall ? "UPDATE" : "REINSTALL";
-        var tone = slot.NeedsInstall ? ButtonTone.Primary : ButtonTone.Ghost;
-        if (Widgets.Button($"##pack{index}", label, FontAwesomeIcon.Download, new Vector2(card.InnerWidth, 34f * Widgets.Scale), tone, installer.Penumbra.Ready))
+        if (Widgets.Button("##fix", problem.FixLabel.ToUpperInvariant(), FixIcon(problem.Fix), new Vector2(width, 40f * Widgets.Scale)))
         {
-            installer.Install(slot);
+            RunFix(problem.Fix, slot);
+        }
+
+        if (slot is null || problem.Fix is not (FixAction.OpenPenumbraCollections or FixAction.OpenPenumbraSettings))
+        {
+            return;
+        }
+
+        ImGui.Spacing();
+        if (Widgets.Button("##continue", "DONE, CONTINUE", FontAwesomeIcon.Play, new Vector2(width, 30f * Widgets.Scale), ButtonTone.Ghost))
+        {
+            plugin.Installer.InstallAll();
         }
     }
 
-    private static void DrawPackChip(PackSlot slot)
+    private void DrawList(PackInstaller installer)
     {
-        if (slot.IsWorking)
+        var slots = installer.Slots;
+        using var card = Widgets.Card(Palette.Violet);
+        for (var slotIndex = 0; slotIndex < slots.Length; slotIndex++)
         {
-            Widgets.Chip("WORKING", Palette.Cyan, true);
+            var slot = slots[slotIndex];
+            var (status, color) = Describe(slot);
+            var version = slot.Record?.Tag ?? slot.Latest?.Tag ?? string.Empty;
+            if (Row($"##pack{slotIndex}", slot.Definition.Title, status, color, version, card.InnerWidth))
+            {
+                ImGui.SetTooltip(PackTooltip(slot));
+            }
         }
-        else if (slot.Problem is not null)
+
+        var mannequinPack = FindMannequinPack(slots);
+        if (mannequinPack is not null)
         {
-            Widgets.Chip("NEEDS ATTENTION", Palette.Danger);
+            DrawMannequinRow(installer, mannequinPack, card.InnerWidth);
         }
-        else if (!slot.InPenumbra)
+    }
+
+    private void DrawMannequinRow(PackInstaller installer, PackSlot mannequinPack, float width)
+    {
+        var collection = plugin.Configuration.MannequinCollectionId;
+        string status;
+        Vector4 color;
+        var unlinked = 0;
+        if (collection == Guid.Empty || !mannequinPack.Enabled)
         {
-            Widgets.Chip("NOT INSTALLED", Palette.Amber);
+            (status, color) = ("Waits for the Cityscape", Palette.InkDim);
         }
-        else if (slot.NeedsInstall)
+        else if (!plugin.Travel.IsInsideVenue)
         {
-            Widgets.Chip("UPDATE READY", Palette.Magenta, true);
-        }
-        else if (!slot.Enabled)
-        {
-            Widgets.Chip("INSTALLED, OFF", Palette.Amber);
+            (status, color) = ("Links when you're in the club", Palette.InkDim);
         }
         else
         {
-            Widgets.Chip("UP TO DATE", Palette.Mint);
+            unlinked = CountUnlinked(installer, collection);
+            (status, color) = unlinked == 0 ? ("Linked", Palette.Mint) : ("Not linked", Palette.Amber);
+        }
+
+        if (Row("##mannequinrow", "Mannequin", status, color, string.Empty, width))
+        {
+            ImGui.SetTooltip($"The {mannequinPack.Definition.Title} is shown on the club's mannequin through your \"{mannequinPack.Definition.Collection}\" collection.");
+        }
+
+        if (unlinked == 0)
+        {
+            return;
+        }
+
+        ImGui.Spacing();
+        if (Widgets.Button("##linknow", "LINK NOW", FontAwesomeIcon.Link, new Vector2(width, 30f * Widgets.Scale), ButtonTone.Ghost))
+        {
+            plugin.Mannequins.LinkAll(plugin.Penumbra, collection);
         }
     }
 
-    private static void DrawVersions(PackSlot slot)
+    private int CountUnlinked(PackInstaller installer, Guid collection)
     {
-        var installed = slot.Record is { } record && slot.InPenumbra
-            ? $"{record.Tag} ({record.InstalledUtc.ToLocalTime():d MMM})"
-            : slot.InPenumbra ? "unknown version" : "none";
-        var latest = slot.Latest is { } release ? $"{release.Tag} · {Format.Bytes(release.Size)}" : "checking...";
-        ImGui.TextColored(Palette.InkDim, "Installed");
-        ImGui.SameLine(90f * Widgets.Scale);
-        ImGui.TextColored(Palette.Ink, installed);
-        ImGui.TextColored(Palette.InkDim, "Latest");
-        ImGui.SameLine(90f * Widgets.Scale);
-        ImGui.TextColored(Palette.Ink, latest);
+        var now = DateTime.UtcNow;
+        if (now >= nextMannequinScanUtc && installer.Penumbra.Ready)
+        {
+            nextMannequinScanUtc = now + MannequinScanInterval;
+            plugin.Mannequins.Scan(plugin.Penumbra, collection);
+        }
+
+        var spots = plugin.Mannequins.Spots;
+        var unlinked = 0;
+        for (var spotIndex = 0; spotIndex < spots.Count; spotIndex++)
+        {
+            if (!spots[spotIndex].Linked)
+            {
+                unlinked++;
+            }
+        }
+
+        return unlinked;
+    }
+
+    private void DrawAdvanced(PackInstaller installer)
+    {
+        var scale = Widgets.Scale;
+        if (Widgets.Button("##advanced", advancedOpen ? "HIDE ADVANCED" : "ADVANCED", advancedOpen ? FontAwesomeIcon.ChevronUp : FontAwesomeIcon.ChevronDown,
+                new Vector2(ImGui.GetContentRegionAvail().X, 30f * scale), ButtonTone.Ghost))
+        {
+            advancedOpen = !advancedOpen;
+        }
+
+        if (!advancedOpen)
+        {
+            return;
+        }
+
+        ImGui.Spacing();
+        using var card = Widgets.Card(Palette.Electric);
+        ImGui.TextColored(Palette.InkDim, "Reinstall downloads a fresh copy, useful if a pack looks broken.");
+        ImGui.Spacing();
+        var slots = installer.Slots;
+        var enabled = installer.Penumbra.Ready && !installer.IsBusy;
+        for (var slotIndex = 0; slotIndex < slots.Length; slotIndex++)
+        {
+            if (Widgets.Button($"##reinstall{slotIndex}", $"REINSTALL {slots[slotIndex].Definition.Title.ToUpperInvariant()}", FontAwesomeIcon.Download,
+                    new Vector2(card.InnerWidth, 30f * scale), ButtonTone.Ghost, enabled))
+            {
+                installer.Install(slots[slotIndex]);
+            }
+
+            ImGui.Spacing();
+        }
+
+        if (Widgets.Button("##openpenumbra", "OPEN PENUMBRA", FontAwesomeIcon.ExternalLinkAlt, new Vector2(card.InnerWidth, 30f * scale), ButtonTone.Ghost))
+        {
+            plugin.Penumbra.Open(TabType.Mods);
+        }
+
+        if (installer.Penumbra.Ready)
+        {
+            ImGui.Spacing();
+            ImGui.TextColored(Palette.InkDim, $"Mod folder: {installer.Penumbra.ModDirectory}");
+        }
+    }
+
+    // Returns true while the row is hovered so the caller can attach a tooltip.
+    private static bool Row(string id, string title, string status, Vector4 color, string trailing, float width)
+    {
+        var drawList = ImGui.GetWindowDrawList();
+        var scale = Widgets.Scale;
+        var height = ImGui.GetTextLineHeight() + 14f * scale;
+        var min = ImGui.GetCursorScreenPos();
+        var itemId = ImGui.GetID(id);
+        ImGui.InvisibleButton(id, new Vector2(width, height));
+        var hovered = ImGui.IsItemHovered();
+        var hover = Widgets.Hover(itemId, hovered ? 1f : 0f);
+        var max = min + new Vector2(width, height);
+        if (hover > 0.01f)
+        {
+            drawList.AddRectFilled(min, max, Palette.U32(Palette.PanelHover, 0.6f * hover), 8f * scale);
+        }
+
+        var midY = (min.Y + max.Y) * 0.5f;
+        var textY = midY - ImGui.GetTextLineHeight() * 0.5f;
+        drawList.AddCircleFilled(new Vector2(min.X + 10f * scale, midY), 4f * scale, Palette.U32(color), 12);
+        var titleX = min.X + 22f * scale;
+        drawList.AddText(new Vector2(titleX, textY), Palette.U32(Palette.Core), title);
+        var statusX = titleX + ImGui.CalcTextSize(title).X + 10f * scale;
+        drawList.AddText(new Vector2(statusX, textY), Palette.U32(color), status);
+        if (trailing.Length > 0)
+        {
+            var trailingWidth = ImGui.CalcTextSize(trailing).X;
+            drawList.AddText(new Vector2(max.X - trailingWidth - 8f * scale, textY), Palette.U32(Palette.InkDim), trailing);
+        }
+
+        return hovered;
+    }
+
+    private static (string Status, Vector4 Color) Describe(PackSlot slot)
+    {
+        if (slot.IsWorking)
+        {
+            return ("Working...", Palette.Cyan);
+        }
+
+        if (slot.Problem is not null)
+        {
+            return ("Needs attention", Palette.Danger);
+        }
+
+        if (!slot.InPenumbra)
+        {
+            return ("Not installed", Palette.Amber);
+        }
+
+        if (slot.NeedsInstall)
+        {
+            return ("Update ready", Palette.Magenta);
+        }
+
+        return slot.Enabled ? ("Ready", Palette.Mint) : ("Needs setup", Palette.Amber);
+    }
+
+    private static string PackTooltip(PackSlot slot)
+    {
+        var installed = slot.Record is { } record && slot.InPenumbra ? $"{record.Tag}, {record.InstalledUtc.ToLocalTime():d MMM}" : slot.InPenumbra ? "unknown version" : "not installed";
+        var latest = slot.Latest is { } release ? $"{release.Tag}, {Format.Bytes(release.Size)}" : "checking";
+        return $"{slot.Definition.Blurb}\n\nInstalled: {installed}\nLatest: {latest}";
+    }
+
+    private static void Headline(string text, Vector4 color)
+    {
+        using (Fonts.Lead())
+        {
+            ImGui.TextColored(color, text);
+        }
     }
 
     private static int StepIndex(InstallStage stage) => stage switch
     {
-        InstallStage.Checking => 0,
         InstallStage.Downloading => 1,
         InstallStage.Unpacking => 2,
         InstallStage.Swapping => 3,
@@ -262,45 +398,12 @@ public sealed class ModsPage
         _ => 0,
     };
 
-    private void DrawProblem(Problem problem, PackSlot? slot)
-    {
-        using var card = Widgets.Card(problem.Severity == ProblemSeverity.Warning ? Palette.Amber : Palette.Danger);
-        DrawProblemBody(problem, slot, card.InnerWidth);
-    }
-
-    private void DrawProblemBody(Problem problem, PackSlot? slot, float width)
-    {
-        var warning = problem.Severity == ProblemSeverity.Warning;
-        var color = warning ? Palette.Amber : Palette.Danger;
-        Widgets.IconText(warning ? FontAwesomeIcon.ExclamationTriangle : FontAwesomeIcon.ExclamationCircle, problem.Title, color);
-        Widgets.Wrapped(problem.Detail, Palette.Ink);
-        if (problem.Fix == FixAction.None)
-        {
-            return;
-        }
-
-        ImGui.Spacing();
-        if (Widgets.Button($"##fix{problem.Title}{slot?.Definition.Id}", problem.FixLabel.ToUpperInvariant(), FixIcon(problem.Fix), new Vector2(width, 36f * Widgets.Scale), warning ? ButtonTone.Ghost : ButtonTone.Primary))
-        {
-            RunFix(problem.Fix, slot);
-        }
-
-        if (problem.Fix is FixAction.OpenPenumbraCollections or FixAction.OpenPenumbraSettings && slot is not null)
-        {
-            ImGui.Spacing();
-            if (Widgets.Button($"##continue{slot.Definition.Id}", "DONE, CONTINUE", FontAwesomeIcon.Play, new Vector2(width, 32f * Widgets.Scale), ButtonTone.Ghost))
-            {
-                plugin.Installer.Install(slot);
-            }
-        }
-    }
-
     private void RunFix(FixAction fix, PackSlot? slot)
     {
         switch (fix)
         {
             case FixAction.Retry when slot is not null:
-                plugin.Installer.Install(slot);
+                plugin.Installer.InstallAll();
                 break;
             case FixAction.Retry:
                 _ = plugin.Installer.CheckAsync(false);
@@ -327,84 +430,19 @@ public sealed class ModsPage
         _ => FontAwesomeIcon.ExternalLinkAlt,
     };
 
-    private void DrawMannequins(PackInstaller installer)
-    {
-        var mannequinPack = FindMannequinPack(installer.Slots);
-        if (mannequinPack is null)
-        {
-            return;
-        }
+    private static PackSlot? FindWorking(PackSlot[] slots) => Find(slots, static slot => slot.IsWorking);
 
-        var configuration = plugin.Configuration;
-        ImGui.Spacing();
-        Widgets.SectionTitle("MANNEQUIN LINK", 91);
-        using var card = Widgets.Card(Palette.Cyan);
-        Widgets.Wrapped($"The {mannequinPack.Definition.Title} is worn by the club's mannequin through the \"{mannequinPack.Definition.Collection}\" collection. Puls8 links it for you the moment you walk in.", Palette.InkMuted);
-        ImGui.Spacing();
-        var autoLink = configuration.AutoLinkMannequins;
-        if (Widgets.Toggle("##autolink", "Link automatically inside the club", "Penumbra remembers the link, so this only runs when something's missing.", ref autoLink))
-        {
-            configuration.AutoLinkMannequins = autoLink;
-            configuration.Save();
-        }
+    private static PackSlot? FindProblem(PackSlot[] slots) => Find(slots, static slot => slot.Problem is not null);
 
-        ImGui.Spacing();
-        var collection = configuration.MannequinCollectionId;
-        if (collection == Guid.Empty)
-        {
-            ImGui.TextColored(Palette.InkDim, $"Install the {mannequinPack.Definition.Title} first.");
-            return;
-        }
+    private static PackSlot? FindAttention(PackSlot[] slots) => Find(slots, static slot => slot.NeedsAttention);
 
-        if (!plugin.Travel.IsInsideVenue)
-        {
-            Widgets.IconText(FontAwesomeIcon.MapMarkerAlt, "Visit the club to see and link its mannequins.", Palette.InkDim);
-            return;
-        }
+    private static PackSlot? FindMannequinPack(PackSlot[] slots) => Find(slots, static slot => slot.Definition.TargetsMannequin);
 
-        var now = DateTime.UtcNow;
-        if (now >= nextMannequinScanUtc && installer.Penumbra.Ready)
-        {
-            nextMannequinScanUtc = now + MannequinScanInterval;
-            plugin.Mannequins.Scan(plugin.Penumbra, collection);
-        }
-
-        var spots = plugin.Mannequins.Spots;
-        if (spots.Count == 0)
-        {
-            ImGui.TextColored(Palette.InkDim, "No mannequins in view yet.");
-            return;
-        }
-
-        var unlinked = 0;
-        for (var spotIndex = 0; spotIndex < spots.Count; spotIndex++)
-        {
-            var spot = spots[spotIndex];
-            if (!spot.Linked)
-            {
-                unlinked++;
-            }
-
-            Widgets.IconText(spot.Linked ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink, $"{spot.Name}  ·  {spot.Distance:0} y", spot.Linked ? Palette.Mint : Palette.Amber);
-        }
-
-        if (unlinked == 0)
-        {
-            return;
-        }
-
-        ImGui.Spacing();
-        if (Widgets.Button("##linknow", "LINK NOW", FontAwesomeIcon.Link, new Vector2(card.InnerWidth, 34f * Widgets.Scale)))
-        {
-            plugin.Mannequins.LinkAll(plugin.Penumbra, collection);
-        }
-    }
-
-    private static PackSlot? FindMannequinPack(PackSlot[] slots)
+    private static PackSlot? Find(PackSlot[] slots, Func<PackSlot, bool> predicate)
     {
         for (var slotIndex = 0; slotIndex < slots.Length; slotIndex++)
         {
-            if (slots[slotIndex].Definition.TargetsMannequin)
+            if (predicate(slots[slotIndex]))
             {
                 return slots[slotIndex];
             }
