@@ -72,6 +72,12 @@ public static class PackFiles
                 Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
                 entry.ExtractToFile(destination, true);
             }
+
+            var stripped = ReservedGamePaths.StripFromPack(stagingPath);
+            if (stripped > 0)
+            {
+                Services.Log.Information($"Dropped {stripped} reserved file redirection(s) Penumbra would refuse anyway");
+            }
         }
         catch (Exception exception) when (exception is InvalidDataException or JsonException)
         {
