@@ -62,6 +62,7 @@ public sealed partial class StaffPage
         }
 
         EditorFields.PopStyle();
+        fileDialog.Draw();
     }
 
     private void DrawUnlock()

@@ -80,12 +80,15 @@ public static class GitHubContents
         return new VenueDocument(json, root.GetProperty("sha").GetString() ?? string.Empty);
     }
 
-    public static async Task<PublishResult> PublishAsync(string key, string json, string sha, string message)
+    public static Task<PublishResult> PublishAsync(string key, string json, string sha, string message)
+        => PutFileAsync(key, FilePath, Encoding.UTF8.GetBytes(json), sha, message);
+
+    public static async Task<PublishResult> PutFileAsync(string key, string path, byte[] content, string sha, string message)
     {
         var body = new JsonObject
         {
             ["message"] = message,
-            ["content"] = Convert.ToBase64String(Encoding.UTF8.GetBytes(json)),
+            ["content"] = Convert.ToBase64String(content),
             ["branch"] = Branch,
         };
         if (sha.Length > 0)
@@ -95,7 +98,7 @@ public static class GitHubContents
 
         try
         {
-            using var response = await SendAsync(HttpMethod.Put, $"repos/{Repository}/contents/{FilePath}", key, body.ToJsonString()).ConfigureAwait(false);
+            using var response = await SendAsync(HttpMethod.Put, $"repos/{Repository}/contents/{path}", key, body.ToJsonString()).ConfigureAwait(false);
             var text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
             if (response.IsSuccessStatusCode)
             {

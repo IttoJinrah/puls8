@@ -195,10 +195,14 @@ public sealed partial class StaffPage
             static (node, half) => EditorFields.Text(node, "close", "CLOSES", half, "01:00", 5)) || changed;
     }
 
-    private static bool DrawCrewMember(JsonObject member, float width, string id)
-        => PairOfFields(member, Half(width),
+    private bool DrawCrewMember(JsonObject member, float width, string id)
+    {
+        var changed = PairOfFields(member, Half(width),
             static (node, half) => EditorFields.Text(node, "name", "NAME", half, "Character name"),
             static (node, half) => EditorFields.Text(node, "role", "ROLE", half, "Bartender"));
+        ImGui.Spacing();
+        return DrawPhoto(member, "crew", Staff.StaffSession.Text(member, "name"), width, id) || changed;
+    }
 
     private static bool DrawLink(JsonObject link, float width, string id)
     {
@@ -209,7 +213,7 @@ public sealed partial class StaffPage
         return changed;
     }
 
-    private static bool DrawMenuSection(JsonObject menuSection, float width, string id)
+    private bool DrawMenuSection(JsonObject menuSection, float width, string id)
     {
         var changed = EditorFields.Text(menuSection, "section", "SECTION NAME", width, "Drinks");
         var items = EditorFields.Array(menuSection, "items");
@@ -227,6 +231,8 @@ public sealed partial class StaffPage
                 static (node, half) => EditorFields.Text(node, "name", "ITEM", half, "Neon Sunset"),
                 static (node, half) => EditorFields.Text(node, "price", "PRICE", half, "50k"));
             changed |= EditorFields.Text(item, "description", "DESCRIPTION", width);
+            ImGui.Spacing();
+            changed |= DrawPhoto(item, "menu", Staff.StaffSession.Text(item, "name"), width, $"{id}item{itemIndex}");
             var removed = EditorFields.Delete($"##{id}item{itemIndex}delete", width);
             ImGui.PopID();
             if (removed)

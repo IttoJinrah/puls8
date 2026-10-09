@@ -77,6 +77,8 @@ public sealed class StaffMember
     public string Name { get; init; } = string.Empty;
 
     public string Role { get; init; } = string.Empty;
+
+    public string Image { get; init; } = string.Empty;
 }
 
 public sealed class MenuSection
@@ -93,6 +95,8 @@ public sealed class MenuItem
     public string Description { get; init; } = string.Empty;
 
     public string Price { get; init; } = string.Empty;
+
+    public string Image { get; init; } = string.Empty;
 }
 
 public sealed class VenueLink
