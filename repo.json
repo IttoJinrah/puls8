@@ -9,13 +9,21 @@
     "Description": "The official companion for Puls8, a rooftop lounge and pool on Raiden (Lavender Beds, Ward 7, Plot 16).\n\n- Tap to travel to the club with Lifestream\n- Live open/closed status, weekly schedule in your local time, and event reminders\n- Join the venue syncshell (Lightless) or turn on ZoneSync (PlayerSync) in one tap\n- Guided, self-checking installer for the Puls8 Penumbra packs (Cityscape & Skybox, Venue Pack)",
     "ApplicableVersion": "any",
     "RepoUrl": "https://github.com/IttoJinrah/puls8",
-    "Tags": ["venue", "club", "roleplay", "penumbra", "lifestream", "syncshell"],
+    "Tags": [
+      "venue",
+      "club",
+      "roleplay",
+      "penumbra",
+      "lifestream",
+      "syncshell"
+    ],
     "DalamudApiLevel": 15,
     "LoadPriority": 0,
     "IconUrl": "https://raw.githubusercontent.com/IttoJinrah/puls8/main/icon.png",
     "ImageUrls": [],
     "DownloadLinkInstall": "https://github.com/IttoJinrah/puls8/releases/download/plugin-v1.0.0.0/Puls8.zip",
     "DownloadLinkTesting": "https://github.com/IttoJinrah/puls8/releases/download/plugin-v1.0.0.0/Puls8.zip",
-    "DownloadLinkUpdate": "https://github.com/IttoJinrah/puls8/releases/download/plugin-v1.0.0.0/Puls8.zip"
+    "DownloadLinkUpdate": "https://github.com/IttoJinrah/puls8/releases/download/plugin-v1.0.0.0/Puls8.zip",
+    "LastUpdate": "1791570141"
   }
 ]
