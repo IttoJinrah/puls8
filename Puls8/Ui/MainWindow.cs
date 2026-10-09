@@ -330,7 +330,8 @@ public sealed class MainWindow : Window, IDisposable
             }
         }
 
-        var targetX = tabCenters[(int)page];
+        // Window-relative so dragging the window moves the underline rigidly instead of making the spring chase it.
+        var targetX = tabCenters[(int)page] - min.X;
         var targetWidth = tabWidths[(int)page] + 10f * scale;
         if (!underlineSnapped)
         {
@@ -339,7 +340,7 @@ public sealed class MainWindow : Window, IDisposable
             underlineSnapped = true;
         }
 
-        var x = Motion.Reduced ? targetX : underlineX.Step(targetX, 0.11f, Motion.Delta);
+        var x = min.X + (Motion.Reduced ? targetX : underlineX.Step(targetX, 0.11f, Motion.Delta));
         var w = Motion.Reduced ? targetWidth : underlineWidth.Step(targetWidth, 0.11f, Motion.Delta);
         var lineY = top + height - 6f * scale;
         Fx.GlowLine(drawList, new Vector2(x - w * 0.5f, lineY), new Vector2(x + w * 0.5f, lineY), Palette.Magenta, 2f * scale);
