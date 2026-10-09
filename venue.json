@@ -16,11 +16,6 @@
       "day": "Friday",
       "open": "23:00",
       "close": "05:00"
-    },
-    {
-      "day": "Saturday",
-      "open": "21:00",
-      "close": "02:00"
     }
   ],
   "events": [],
