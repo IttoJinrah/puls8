@@ -21,8 +21,17 @@ public sealed class MainWindow : Window, IDisposable
     private const float HeaderHeight = 62f;
     private const float TabsHeight = 40f;
     private const float ContentPadding = 16f;
+    private const float HeaderButtonSize = 28f;
+    private const float HeaderButtonGap = 8f;
+    private const float CollapseSmoothTime = 0.12f;
     private const int StyleVarCount = 4;
+    private const ImGuiWindowFlags BaseFlags = ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse
+        | ImGuiWindowFlags.NoBackground | ImGuiWindowFlags.NoCollapse;
 
+    private static readonly Vector2 DefaultSize = new(580f, 780f);
+    private static readonly Vector2 MaximumSize = new(1100f, 1400f);
+    private static readonly WindowSizeConstraints ExpandedConstraints = new() { MinimumSize = new Vector2(480f, 560f), MaximumSize = MaximumSize };
+    private static readonly WindowSizeConstraints CompactConstraints = new() { MinimumSize = new Vector2(480f, HeaderHeight), MaximumSize = MaximumSize };
     private static readonly string[] TabLabels = ["HOME", "EVENTS", "LOUNGE", "WIFI", "MODS", "ABOUT"];
 
     private readonly Plugin plugin;
@@ -36,16 +45,22 @@ public sealed class MainWindow : Window, IDisposable
     private readonly float[] tabWidths = new float[TabLabels.Length];
     private Spring underlineX;
     private Spring underlineWidth;
+    private Spring collapse;
     private Page page;
     private bool underlineSnapped;
+    private bool compact;
+    private bool sizeDriven;
+    private Vector2 expandedSize = DefaultSize;
 
     public MainWindow(Plugin plugin)
-        : base("Puls8###Puls8Main", ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse | ImGuiWindowFlags.NoBackground)
+        : base("Puls8###Puls8Main", BaseFlags)
     {
         this.plugin = plugin;
-        Size = new Vector2(580f, 780f);
+        Size = DefaultSize;
         SizeCondition = ImGuiCond.FirstUseEver;
-        SizeConstraints = new WindowSizeConstraints { MinimumSize = new Vector2(480f, 560f), MaximumSize = new Vector2(1100f, 1400f) };
+        SizeConstraints = ExpandedConstraints;
+        AllowPinning = false;
+        AllowClickthrough = false;
         home = new HomePage(plugin, Show);
         events = new EventsPage(plugin);
         lounge = new LoungePage(plugin);
@@ -57,6 +72,7 @@ public sealed class MainWindow : Window, IDisposable
     public void Show(Page target)
     {
         page = target;
+        compact = false;
         IsOpen = true;
         if (target == Page.Mods)
         {
@@ -73,12 +89,40 @@ public sealed class MainWindow : Window, IDisposable
         }
     }
 
+    // While minimizing or restoring, the height is driven every frame from the remembered expanded size.
     public override void PreDraw()
     {
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, Vector2.Zero);
         ImGui.PushStyleVar(ImGuiStyleVar.WindowBorderSize, 0f);
         ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, WindowRounding);
         ImGui.PushStyleVar(ImGuiStyleVar.ScrollbarSize, 8f);
+
+        var target = compact ? 1f : 0f;
+        var amount = Motion.Reduced ? target : collapse.Step(target, CollapseSmoothTime, Motion.Delta);
+        if (Motion.Reduced)
+        {
+            collapse.Snap(target);
+        }
+
+        var wasSizeDriven = sizeDriven;
+        sizeDriven = compact || amount > 0.001f;
+        Flags = sizeDriven ? BaseFlags | ImGuiWindowFlags.NoResize : BaseFlags;
+        SizeConstraints = sizeDriven ? CompactConstraints : ExpandedConstraints;
+        if (sizeDriven)
+        {
+            Size = new Vector2(expandedSize.X, expandedSize.Y + (HeaderHeight - expandedSize.Y) * Math.Clamp(amount, 0f, 1f));
+            SizeCondition = ImGuiCond.Always;
+            return;
+        }
+
+        if (wasSizeDriven)
+        {
+            Size = expandedSize;
+            SizeCondition = ImGuiCond.Always;
+            return;
+        }
+
+        SizeCondition = ImGuiCond.FirstUseEver;
     }
 
     public override void PostDraw() => ImGui.PopStyleVar(StyleVarCount);
@@ -89,12 +133,30 @@ public sealed class MainWindow : Window, IDisposable
         var scale = Widgets.Scale;
         var drawList = ImGui.GetWindowDrawList();
         var windowMin = ImGui.GetWindowPos();
-        var windowMax = windowMin + ImGui.GetWindowSize();
+        var windowSize = ImGui.GetWindowSize();
+        var windowMax = windowMin + windowSize;
+        if (!sizeDriven)
+        {
+            expandedSize = windowSize / scale;
+        }
+
+        if (HandleHeaderDrag(windowMin, windowSize.X, HeaderHeight * scale, scale))
+        {
+            compact = !compact;
+        }
+
         DrawBackdrop(drawList, windowMin, windowMax, scale);
         DrawHeader(drawList, windowMin, windowMax, scale);
-        DrawTabs(drawList, windowMin, windowMax, scale);
-        DrawContent(windowMin, windowMax, scale);
-        Fx.Scanlines(drawList, windowMin + new Vector2(0f, WindowRounding), windowMax - new Vector2(0f, WindowRounding), 0.10f);
+        var reveal = 1f - Math.Clamp(collapse.Value, 0f, 1f);
+        if (reveal > 0.02f)
+        {
+            ImGui.PushStyleVar(ImGuiStyleVar.Alpha, reveal);
+            DrawTabs(drawList, windowMin, windowMax, scale);
+            DrawContent(windowMin, windowMax, scale);
+            ImGui.PopStyleVar();
+        }
+
+        Fx.Scanlines(drawList, windowMin + new Vector2(0f, 4f * scale), windowMax - new Vector2(0f, 4f * scale), 0.10f);
         Fx.GradientBorder(drawList, windowMin, windowMax, WindowRounding, 1.4f, 0.75f);
     }
 
@@ -102,20 +164,43 @@ public sealed class MainWindow : Window, IDisposable
     {
     }
 
+    private static float HeaderButtonsWidth(float scale) => (HeaderButtonSize * 2f + HeaderButtonGap) * scale;
+
+    // The window has no title bar, so the header strip doubles as the drag handle; double-click toggles minimize.
+    private static bool HandleHeaderDrag(Vector2 origin, float width, float height, float scale)
+    {
+        var dragWidth = width - ContentPadding * scale - HeaderButtonsWidth(scale) - 8f * scale;
+        ImGui.SetCursorScreenPos(origin);
+        ImGui.InvisibleButton("##puls8drag", new Vector2(MathF.Max(1f, dragWidth), height));
+        var doubleClicked = ImGui.IsItemHovered() && ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left);
+        if (ImGui.IsItemActive())
+        {
+            var delta = ImGui.GetIO().MouseDelta;
+            if (delta != Vector2.Zero)
+            {
+                ImGui.SetWindowPos(ImGui.GetWindowPos() + delta, ImGuiCond.Always);
+            }
+        }
+
+        return doubleClicked;
+    }
+
     private static void DrawBackdrop(ImDrawListPtr drawList, Vector2 min, Vector2 max, float scale)
     {
         drawList.AddRectFilled(min, max, Palette.U32(Palette.Void, 0.97f), WindowRounding);
-        Fx.VerticalGradient(drawList, min, new Vector2(max.X, min.Y + 240f * scale),
+        var height = max.Y - min.Y;
+        Fx.VerticalGradient(drawList, min, new Vector2(max.X, min.Y + MathF.Min(240f * scale, height)),
             Palette.WithAlpha(Palette.Indigo, 0.6f), Palette.WithAlpha(Palette.Indigo, 0f), WindowRounding, ImDrawFlags.RoundCornersTop);
-        Fx.VerticalGradient(drawList, new Vector2(min.X, max.Y - 160f * scale), max,
+        Fx.VerticalGradient(drawList, new Vector2(min.X, max.Y - MathF.Min(160f * scale, height)), max,
             Palette.WithAlpha(Palette.Magenta, 0f), Palette.WithAlpha(Palette.Magenta, 0.12f), WindowRounding, ImDrawFlags.RoundCornersBottom);
     }
 
     private void DrawHeader(ImDrawListPtr drawList, Vector2 min, Vector2 max, float scale)
     {
         var height = HeaderHeight * scale;
+        var midY = min.Y + height * 0.5f;
         var logoSize = 40f * scale;
-        var logoMin = min + new Vector2(16f * scale, (height - logoSize) * 0.5f + 4f * scale);
+        var logoMin = new Vector2(min.X + ContentPadding * scale, midY - logoSize * 0.5f);
         var logo = Images.Logo;
         if (logo is not null)
         {
@@ -132,13 +217,32 @@ public sealed class MainWindow : Window, IDisposable
             var fontSize = ImGui.GetFontSize();
             var word = profile.Name.ToUpperInvariant();
             var wordSize = ImGui.CalcTextSize(word);
-            var position = new Vector2(logoMin.X + logoSize + 12f * scale, min.Y + (height - wordSize.Y) * 0.5f + 2f * scale);
+            var position = new Vector2(logoMin.X + logoSize + 12f * scale, midY - wordSize.Y * 0.5f);
             Fx.GradientText(drawList, font, fontSize, position, word, wordSize.X, Motion.Phase(6000.0));
             Fx.GlitchText(drawList, font, fontSize, position, wordSize, word, 1);
         }
 
-        DrawCloseButton(drawList, new Vector2(max.X - 40f * scale, min.Y + (height - 26f * scale) * 0.5f + 2f * scale), 26f * scale);
-        DrawStatusChip(max.X - 52f * scale, min.Y + height * 0.5f + 2f * scale);
+        var buttonsLeft = max.X - ContentPadding * scale - HeaderButtonsWidth(scale);
+        DrawHeaderButtons(buttonsLeft, midY, scale);
+        DrawStatusChip(buttonsLeft - 12f * scale, midY);
+    }
+
+    private void DrawHeaderButtons(float left, float midY, float scale)
+    {
+        var size = HeaderButtonSize * scale;
+        var top = midY - size * 0.5f;
+        ImGui.SetCursorScreenPos(new Vector2(left, top));
+        var minimizeIcon = compact ? FontAwesomeIcon.ChevronDown : FontAwesomeIcon.Minus;
+        if (Widgets.IconButton("##puls8minimize", minimizeIcon, size, compact ? "Restore" : "Minimize to the header strip", Palette.Cyan))
+        {
+            compact = !compact;
+        }
+
+        ImGui.SetCursorScreenPos(new Vector2(left + size + HeaderButtonGap * scale, top));
+        if (Widgets.IconButton("##puls8close", FontAwesomeIcon.Times, size, "Close", Palette.Magenta))
+        {
+            IsOpen = false;
+        }
     }
 
     private void DrawStatusChip(float right, float centerY)
@@ -168,7 +272,7 @@ public sealed class MainWindow : Window, IDisposable
         }
 
         var textSize = ImGui.CalcTextSize(text);
-        var width = textSize.X + 34f * Widgets.Scale;
+        var width = textSize.X + 30f * Widgets.Scale;
         var height = textSize.Y + 6f * Widgets.Scale;
         ImGui.SetCursorScreenPos(new Vector2(right - width, centerY - height * 0.5f));
         Widgets.Chip(text, color, true);
@@ -176,24 +280,6 @@ public sealed class MainWindow : Window, IDisposable
 
     private static string VenueClockText(DateTimeOffset boundary)
         => Venue.VenueClock.FormatCountdown(boundary - DateTimeOffset.UtcNow).ToUpperInvariant();
-
-    private void DrawCloseButton(ImDrawListPtr drawList, Vector2 min, float size)
-    {
-        ImGui.SetCursorScreenPos(min);
-        var itemId = ImGui.GetID("##close");
-        if (ImGui.InvisibleButton("##close", new Vector2(size)))
-        {
-            IsOpen = false;
-        }
-
-        var hover = Widgets.Hover(itemId, ImGui.IsItemHovered() ? 1f : 0f);
-        var center = min + new Vector2(size * 0.5f);
-        drawList.AddCircleFilled(center, size * 0.5f, Palette.U32(Palette.Magenta, 0.08f + hover * 0.25f), 24);
-        var arm = size * 0.2f;
-        var ink = Palette.U32(Palette.Mix(Palette.InkMuted, Palette.Core, hover));
-        drawList.AddLine(center - new Vector2(arm), center + new Vector2(arm), ink, 1.8f);
-        drawList.AddLine(center + new Vector2(-arm, arm), center + new Vector2(arm, -arm), ink, 1.8f);
-    }
 
     private void DrawTabs(ImDrawListPtr drawList, Vector2 min, Vector2 max, float scale)
     {

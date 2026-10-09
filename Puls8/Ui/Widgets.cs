@@ -69,6 +69,39 @@ public static class Widgets
         return clicked;
     }
 
+    public static bool IconButton(string id, FontAwesomeIcon icon, float size, string tooltip, Vector4 accent)
+    {
+        var drawList = ImGui.GetWindowDrawList();
+        var min = ImGui.GetCursorScreenPos();
+        var itemId = ImGui.GetID(id);
+        var clicked = ImGui.InvisibleButton(id, new Vector2(size));
+        var hovered = ImGui.IsItemHovered();
+        if (hovered)
+        {
+            ImGui.SetMouseCursor(ImGuiMouseCursor.Hand);
+            ImGui.SetTooltip(tooltip);
+        }
+
+        var hover = Hover(itemId, hovered ? 1f : 0f);
+        var center = min + new Vector2(size * 0.5f);
+        var radius = size * 0.5f;
+        drawList.AddCircleFilled(center, radius, Palette.U32(Palette.Mix(Palette.PanelRaised, accent, hover * 0.35f), 0.75f), 32);
+        drawList.AddCircle(center, radius - 0.5f, Palette.U32(accent, 0.35f + hover * 0.55f), 32, 1.2f);
+        if (hover > 0.01f)
+        {
+            drawList.AddCircle(center, radius + 2.5f * Scale, Palette.U32(accent, 0.25f * hover), 32, 2f);
+        }
+
+        using (Fonts.Icon())
+        {
+            var glyph = icon.ToIconString();
+            var glyphSize = ImGui.CalcTextSize(glyph);
+            drawList.AddText(center - glyphSize * 0.5f, Palette.U32(Palette.Mix(Palette.InkMuted, Palette.Core, hover)), glyph);
+        }
+
+        return clicked;
+    }
+
     public static void Chip(string text, Vector4 color, bool pulse = false)
     {
         var drawList = ImGui.GetWindowDrawList();
