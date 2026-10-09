@@ -30,6 +30,7 @@ public sealed class PenumbraBridge : IDisposable
     private readonly TrySetModPriority trySetModPriority;
     private readonly GetCurrentModSettings getCurrentModSettings;
     private readonly RedrawObject redrawObject;
+    private readonly RedrawAll redrawAll;
     private readonly OpenMainWindow openMainWindow;
     private readonly EventSubscriber initialized;
     private readonly EventSubscriber disposed;
@@ -51,6 +52,7 @@ public sealed class PenumbraBridge : IDisposable
         trySetModPriority = new TrySetModPriority(pluginInterface);
         getCurrentModSettings = new GetCurrentModSettings(pluginInterface);
         redrawObject = new RedrawObject(pluginInterface);
+        redrawAll = new RedrawAll(pluginInterface);
         openMainWindow = new OpenMainWindow(pluginInterface);
         initialized = Initialized.Subscriber(pluginInterface, RaiseChanged);
         disposed = Disposed.Subscriber(pluginInterface, RaiseChanged);
@@ -163,6 +165,20 @@ public sealed class PenumbraBridge : IDisposable
     }
 
     public void Redraw(int objectIndex) => redrawObject.Invoke(objectIndex);
+
+    // Redraws characters only (players, NPCs, mannequins); housing furniture reloads with the zone, not with a redraw.
+    public bool RedrawEverything()
+    {
+        try
+        {
+            redrawAll.Invoke();
+            return true;
+        }
+        catch (IpcError)
+        {
+            return false;
+        }
+    }
 
     public bool Open(TabType tab)
     {

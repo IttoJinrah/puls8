@@ -37,6 +37,7 @@ public sealed class ModsPage
 
         DrawPenumbraStatus(installer);
         DrawPrimaryAction(installer);
+        DrawApply(installer);
         var slots = installer.Slots;
         for (var slotIndex = 0; slotIndex < slots.Length; slotIndex++)
         {
@@ -120,6 +121,32 @@ public sealed class ModsPage
         }
 
         ImGui.Spacing();
+    }
+
+    private void DrawApply(PackInstaller installer)
+    {
+        var configuration = plugin.Configuration;
+        using var card = Widgets.Card(Palette.Cyan);
+        var redraw = configuration.RedrawAfterInstall;
+        if (Widgets.Toggle("##redrawafter", "Refresh everything after installing", "Packs are switched on automatically; this also redraws everyone so changes show without a relog.", ref redraw))
+        {
+            configuration.RedrawAfterInstall = redraw;
+            configuration.Save();
+        }
+
+        if (installer.NeedsZoneReload)
+        {
+            ImGui.Spacing();
+            Widgets.IconText(FontAwesomeIcon.DoorOpen, "Step outside and back in to load the new furniture and pool.", Palette.Amber);
+        }
+
+        ImGui.Spacing();
+        if (Widgets.Button("##redrawnow", "REDRAW NOW", FontAwesomeIcon.SyncAlt, new Vector2(card.InnerWidth, 30f * Widgets.Scale), ButtonTone.Ghost, installer.Penumbra.Ready && !installer.IsBusy))
+        {
+            plugin.Penumbra.RedrawEverything();
+        }
+
+        ImGui.TextColored(Palette.InkDim, "Redraw refreshes characters and the mannequin. Furniture reloads when you re-enter the house.");
     }
 
     private void DrawPack(PackInstaller installer, PackSlot slot, int index)

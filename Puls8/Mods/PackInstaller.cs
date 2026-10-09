@@ -65,6 +65,9 @@ public sealed class PackInstaller : IDisposable
 
     public bool IsStale { get; private set; } = true;
 
+    // Set when a scenery pack (Base collection: furniture, pool) changed; cleared once the player changes zone.
+    public bool NeedsZoneReload { get; private set; }
+
     public int PendingCount
     {
         get
@@ -176,6 +179,8 @@ public sealed class PackInstaller : IDisposable
 
     public void Cancel() => cancellation?.Cancel();
 
+    public void OnZoneChanged() => NeedsZoneReload = false;
+
     public void Dispose()
     {
         penumbra.Changed -= MarkStale;
@@ -196,6 +201,8 @@ public sealed class PackInstaller : IDisposable
         try
         {
             var current = slots;
+            var installed = 0;
+            var sceneryChanged = false;
             for (var slotIndex = 0; slotIndex < current.Length; slotIndex++)
             {
                 var slot = current[slotIndex];
@@ -209,9 +216,16 @@ public sealed class PackInstaller : IDisposable
                 {
                     break;
                 }
+
+                installed++;
+                sceneryChanged |= !slot.Definition.TargetsMannequin;
             }
 
             await PenumbraBridge.OnFramework(() => ReadPenumbra(current)).ConfigureAwait(false);
+            if (installed > 0)
+            {
+                await PenumbraBridge.OnFramework(() => ApplyInstalled(sceneryChanged)).ConfigureAwait(false);
+            }
         }
         finally
         {
@@ -342,6 +356,22 @@ public sealed class PackInstaller : IDisposable
         }
 
         await PackFiles.MoveWithRetriesAsync(staging, target, token).ConfigureAwait(false);
+    }
+
+    private void ApplyInstalled(bool sceneryChanged)
+    {
+        if (configuration.RedrawAfterInstall)
+        {
+            penumbra.RedrawEverything();
+        }
+
+        if (!sceneryChanged)
+        {
+            return;
+        }
+
+        NeedsZoneReload = true;
+        Services.Chat.Print("Venue mods installed. Step outside and back in to load the new furniture and pool.", "Puls8", 541);
     }
 
     private Guid ResolveCollection(PackDefinition definition)

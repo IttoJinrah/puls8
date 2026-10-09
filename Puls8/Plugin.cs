@@ -44,6 +44,7 @@ public sealed class Plugin : IDalamudPlugin
         pluginInterface.UiBuilder.OpenConfigUi += OpenMods;
         Services.Framework.Update += OnFrameworkUpdate;
         Services.ClientState.Login += OnLogin;
+        Services.ClientState.TerritoryChanged += OnTerritoryChanged;
         Services.Commands.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
             HelpMessage = "Open Puls8. Add travel, wifi, events, menu or mods to jump straight there.",
@@ -78,6 +79,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         Services.Commands.RemoveHandler(CommandName);
         Services.ClientState.Login -= OnLogin;
+        Services.ClientState.TerritoryChanged -= OnTerritoryChanged;
         Services.Framework.Update -= OnFrameworkUpdate;
         Services.PluginInterface.UiBuilder.Draw -= windows.Draw;
         Services.PluginInterface.UiBuilder.OpenMainUi -= OpenHome;
@@ -98,6 +100,8 @@ public sealed class Plugin : IDalamudPlugin
     }
 
     private void OnLogin() => _ = Installer.CheckAsync(true);
+
+    private void OnTerritoryChanged(uint territory) => Installer.OnZoneChanged();
 
     private void OnVenueChanged() => _ = Services.Framework.RunOnFrameworkThread(() => Installer.Bind(Feed.Current));
 

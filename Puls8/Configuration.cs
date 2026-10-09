@@ -15,6 +15,8 @@ public sealed class Configuration : IPluginConfiguration
 
     public bool NotifyPackUpdates { get; set; } = true;
 
+    public bool RedrawAfterInstall { get; set; } = true;
+
     public bool ReducedMotion { get; set; }
 
     public string StaffKey { get; set; } = string.Empty;
