@@ -13,6 +13,7 @@ public enum Page : byte
     Wifi,
     Mods,
     About,
+    Staff,
 }
 
 public sealed class MainWindow : Window, IDisposable
@@ -32,7 +33,7 @@ public sealed class MainWindow : Window, IDisposable
     private static readonly Vector2 MaximumSize = new(1100f, 1400f);
     private static readonly WindowSizeConstraints ExpandedConstraints = new() { MinimumSize = new Vector2(480f, 560f), MaximumSize = MaximumSize };
     private static readonly WindowSizeConstraints CompactConstraints = new() { MinimumSize = new Vector2(480f, HeaderHeight), MaximumSize = MaximumSize };
-    private static readonly string[] TabLabels = ["HOME", "EVENTS", "LOUNGE", "WIFI", "MODS", "ABOUT"];
+    private static readonly string[] TabLabels = ["HOME", "EVENTS", "LOUNGE", "WIFI", "MODS", "ABOUT", "STAFF"];
 
     private readonly Plugin plugin;
     private readonly HomePage home;
@@ -41,6 +42,7 @@ public sealed class MainWindow : Window, IDisposable
     private readonly WifiPage wifi;
     private readonly ModsPage mods;
     private readonly AboutPage about;
+    private readonly StaffPage staff;
     private readonly float[] tabCenters = new float[TabLabels.Length];
     private readonly float[] tabWidths = new float[TabLabels.Length];
     private Spring underlineX;
@@ -67,6 +69,7 @@ public sealed class MainWindow : Window, IDisposable
         wifi = new WifiPage(plugin);
         mods = new ModsPage(plugin);
         about = new AboutPage(plugin);
+        staff = new StaffPage(plugin);
     }
 
     public void Show(Page target)
@@ -287,11 +290,13 @@ public sealed class MainWindow : Window, IDisposable
         var height = TabsHeight * scale;
         var left = min.X + ContentPadding * scale;
         var width = max.X - min.X - ContentPadding * 2f * scale;
-        var slot = width / TabLabels.Length;
+        // The staff tab only exists for someone holding a verified key; everyone else sees six tabs.
+        var tabCount = plugin.Staff.IsUnlocked ? TabLabels.Length : TabLabels.Length - 1;
+        var slot = width / tabCount;
         var updates = plugin.Installer.PendingCount;
         using (Fonts.Label())
         {
-            for (var tabIndex = 0; tabIndex < TabLabels.Length; tabIndex++)
+            for (var tabIndex = 0; tabIndex < tabCount; tabIndex++)
             {
                 var label = TabLabels[tabIndex];
                 var slotMin = new Vector2(left + slot * tabIndex, top);
@@ -330,6 +335,12 @@ public sealed class MainWindow : Window, IDisposable
             }
         }
 
+        drawList.AddLine(new Vector2(left, top + height), new Vector2(left + width, top + height), Palette.U32(Palette.Violet, 0.25f), 1f);
+        if ((int)page >= tabCount)
+        {
+            return;
+        }
+
         // Window-relative so dragging the window moves the underline rigidly instead of making the spring chase it.
         var targetX = tabCenters[(int)page] - min.X;
         var targetWidth = tabWidths[(int)page] + 10f * scale;
@@ -344,7 +355,6 @@ public sealed class MainWindow : Window, IDisposable
         var w = Motion.Reduced ? targetWidth : underlineWidth.Step(targetWidth, 0.11f, Motion.Delta);
         var lineY = top + height - 6f * scale;
         Fx.GlowLine(drawList, new Vector2(x - w * 0.5f, lineY), new Vector2(x + w * 0.5f, lineY), Palette.Magenta, 2f * scale);
-        drawList.AddLine(new Vector2(left, top + height), new Vector2(left + width, top + height), Palette.U32(Palette.Violet, 0.25f), 1f);
     }
 
     private void DrawContent(Vector2 min, Vector2 max, float scale)
@@ -362,6 +372,12 @@ public sealed class MainWindow : Window, IDisposable
         {
             ImGui.PushItemWidth(-1f);
             ImGui.Dummy(new Vector2(0f, 2f * scale));
+            if (plugin.Feed.IsPreviewing && page != Page.Staff)
+            {
+                Widgets.Chip("PREVIEWING YOUR UNPUBLISHED STAFF CHANGES", Palette.Amber, true);
+                ImGui.Spacing();
+            }
+
             switch (page)
             {
                 case Page.Home:
@@ -378,6 +394,9 @@ public sealed class MainWindow : Window, IDisposable
                     break;
                 case Page.Mods:
                     mods.Draw();
+                    break;
+                case Page.Staff:
+                    staff.Draw();
                     break;
                 default:
                     about.Draw();

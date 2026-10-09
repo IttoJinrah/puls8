@@ -17,6 +17,8 @@ public sealed class Configuration : IPluginConfiguration
 
     public bool ReducedMotion { get; set; }
 
+    public string StaffKey { get; set; } = string.Empty;
+
     public HashSet<string> EventReminders { get; set; } = new();
 
     public HashSet<string> FiredReminders { get; set; } = new();

@@ -40,11 +40,17 @@ public sealed partial class VenueFeed
         var configDirectory = Services.PluginInterface.GetPluginConfigDirectory();
         cachePath = Path.Combine(configDirectory, CacheFileName);
         eTagPath = Path.Combine(configDirectory, ETagFileName);
-        Current = LoadLocal(out var source);
+        live = LoadLocal(out var source);
         Source = source;
     }
 
-    public VenueProfile Current { get; private set; }
+    private VenueProfile live;
+    private VenueProfile? preview;
+
+    // Staff previewing an unpublished draft see it everywhere; nobody else is affected.
+    public VenueProfile Current => preview ?? live;
+
+    public bool IsPreviewing => preview is not null;
 
     public FeedSource Source { get; private set; }
 
@@ -101,7 +107,7 @@ public sealed partial class VenueFeed
         {
             if (Source != FeedSource.Live)
             {
-                Publish(Current, FeedSource.Live);
+                Publish(live, FeedSource.Live);
             }
 
             return;
@@ -124,7 +130,7 @@ public sealed partial class VenueFeed
 
     private void Publish(VenueProfile profile, FeedSource source)
     {
-        Current = profile;
+        live = profile;
         Source = source;
         Changed?.Invoke();
     }
@@ -155,7 +161,31 @@ public sealed partial class VenueFeed
         }
     }
 
-    private static VenueProfile? Parse(string json)
+    public void SetPreview(VenueProfile? draft) => preview = draft;
+
+    // raw.githubusercontent.com caches for minutes; applying the just-published file avoids showing staff stale data.
+    public void ApplyPublished(string json)
+    {
+        var profile = Parse(json);
+        if (profile is null)
+        {
+            return;
+        }
+
+        try
+        {
+            File.WriteAllText(cachePath, json);
+            File.Delete(eTagPath);
+        }
+        catch (IOException exception)
+        {
+            Services.Log.Information($"Could not cache the published venue.json: {exception.Message}");
+        }
+
+        Publish(profile, FeedSource.Live);
+    }
+
+    public static VenueProfile? Parse(string json)
     {
         if (json.Length == 0)
         {

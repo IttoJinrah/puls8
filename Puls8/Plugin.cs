@@ -4,6 +4,7 @@ using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using Puls8.Mods;
+using Puls8.Staff;
 using Puls8.Travel;
 using Puls8.Ui;
 using Puls8.Venue;
@@ -31,6 +32,7 @@ public sealed class Plugin : IDalamudPlugin
         Mannequins = new MannequinLinker();
         Installer = new PackInstaller(Configuration, Penumbra, Catalog, Mannequins);
         Travel = new TravelService(new LifestreamBridge());
+        Staff = new StaffSession(Configuration, Feed);
         Installer.Bind(Feed.Current);
         Feed.Changed += OnVenueChanged;
 
@@ -48,6 +50,7 @@ public sealed class Plugin : IDalamudPlugin
         });
 
         PackDownloader.SweepTempDirectory();
+        Staff.Restore();
         _ = StartupAsync();
     }
 
@@ -68,6 +71,8 @@ public sealed class Plugin : IDalamudPlugin
     public PackInstaller Installer { get; }
 
     public TravelService Travel { get; }
+
+    public StaffSession Staff { get; }
 
     public void Dispose()
     {
@@ -138,9 +143,10 @@ public sealed class Plugin : IDalamudPlugin
         {
             "wifi" or "sync" => Page.Wifi,
             "events" => Page.Events,
-            "menu" or "staff" => Page.Lounge,
+            "menu" or "lounge" => Page.Lounge,
             "mods" or "update" => Page.Mods,
             "about" => Page.About,
+            "staff" => Page.Staff,
             _ => Page.Home,
         };
 
