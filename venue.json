@@ -18,7 +18,16 @@
       "close": "05:00"
     }
   ],
-  "events": [],
+  "events": [
+    {
+      "id": "event-20261009183757",
+      "title": "PULS8 PRESENTS: MYSPACE ERA",
+      "host": "DJ R'ael, DJ Garbagio",
+      "starts": "2026-10-09T23:00:00+03:00",
+      "minutes": 360,
+      "blurb": "online status: emotionally unstable\n\nBRING BACK THE CHAOS.\n\nWe're taking it back to the 2000s — when the eyeliner was heavy, the fringes covered one eye, the playlists were full of angst, and every profile had a questionable song playing on autoplay\n\n\nSo grab your eyeliner, update your imaginary profile, and get ready to make 2007 jealous.\n\nRAWЯ XD"
+    }
+  ],
   "links": [
     {
       "label": "Discord",
