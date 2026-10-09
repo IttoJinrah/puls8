@@ -8,7 +8,6 @@ public sealed partial class StaffPage
 {
     private static readonly string[] Days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
     private static readonly string[] Districts = ["Mist", "Lavender Beds", "Goblet", "Shirogane", "Empyreum"];
-    private static readonly string[] LinkKinds = ["discord", "website", "twitch", "other"];
 
     private delegate bool RowDrawer(JsonObject row, float width, string id);
 
@@ -37,45 +36,6 @@ public sealed partial class StaffPage
 
         ImGui.Spacing();
         return DrawRows(schedule, "slot", Palette.Electric, DrawSlot) || changed;
-    }
-
-    private bool DrawLounge(JsonObject draft)
-    {
-        Widgets.SectionTitle("CREW", 121);
-        var staff = EditorFields.Array(draft, "staff");
-        if (AddButton("##addstaff", "ADD CREW MEMBER"))
-        {
-            staff.Add(new JsonObject { ["name"] = string.Empty, ["role"] = string.Empty });
-            return true;
-        }
-
-        ImGui.Spacing();
-        var changed = DrawRows(staff, "staff", Palette.Magenta, DrawCrewMember);
-
-        Widgets.SectionTitle("MENU", 122);
-        var menu = EditorFields.Array(draft, "menu");
-        if (AddButton("##addsection", "ADD MENU SECTION"))
-        {
-            menu.Add(new JsonObject { ["section"] = "New section", ["items"] = new JsonArray() });
-            return true;
-        }
-
-        ImGui.Spacing();
-        changed |= DrawRows(menu, "menu", Palette.Violet, DrawMenuSection);
-
-        Widgets.SectionTitle("HOUSE RULES", 123);
-        changed |= DrawRules(EditorFields.Array(draft, "rules"));
-
-        Widgets.SectionTitle("LINKS", 124);
-        var links = EditorFields.Array(draft, "links");
-        if (AddButton("##addlink", "ADD LINK"))
-        {
-            links.Add(new JsonObject { ["label"] = string.Empty, ["url"] = "https://", ["kind"] = "website" });
-            return true;
-        }
-
-        ImGui.Spacing();
-        return DrawRows(links, "link", Palette.Cyan, DrawLink) || changed;
     }
 
     private bool DrawClub(JsonObject draft)
@@ -193,97 +153,6 @@ public sealed partial class StaffPage
         return PairOfFields(slot, Half(width),
             static (node, half) => EditorFields.Text(node, "open", "OPENS", half, "21:00", 5),
             static (node, half) => EditorFields.Text(node, "close", "CLOSES", half, "01:00", 5)) || changed;
-    }
-
-    private bool DrawCrewMember(JsonObject member, float width, string id)
-    {
-        var changed = PairOfFields(member, Half(width),
-            static (node, half) => EditorFields.Text(node, "name", "NAME", half, "Character name"),
-            static (node, half) => EditorFields.Text(node, "role", "ROLE", half, "Bartender"));
-        ImGui.Spacing();
-        return DrawPhoto(member, "crew", Staff.StaffSession.Text(member, "name"), width, id) || changed;
-    }
-
-    private static bool DrawLink(JsonObject link, float width, string id)
-    {
-        var changed = PairOfFields(link, Half(width),
-            static (node, half) => EditorFields.Text(node, "label", "LABEL", half, "Discord"),
-            static (node, half) => EditorFields.Combo(node, "kind", "KIND", half, LinkKinds));
-        changed |= EditorFields.Text(link, "url", "URL (HTTPS ONLY)", width, "https://");
-        return changed;
-    }
-
-    private bool DrawMenuSection(JsonObject menuSection, float width, string id)
-    {
-        var changed = EditorFields.Text(menuSection, "section", "SECTION NAME", width, "Drinks");
-        var items = EditorFields.Array(menuSection, "items");
-        for (var itemIndex = 0; itemIndex < items.Count; itemIndex++)
-        {
-            if (ObjectAt(items, itemIndex) is not { } item)
-            {
-                continue;
-            }
-
-            ImGui.PushID(itemIndex);
-            ImGui.Spacing();
-            ImGui.Separator();
-            changed |= PairOfFields(item, Half(width),
-                static (node, half) => EditorFields.Text(node, "name", "ITEM", half, "Neon Sunset"),
-                static (node, half) => EditorFields.Text(node, "price", "PRICE", half, "50k"));
-            changed |= EditorFields.Text(item, "description", "DESCRIPTION", width);
-            ImGui.Spacing();
-            changed |= DrawPhoto(item, "menu", Staff.StaffSession.Text(item, "name"), width, $"{id}item{itemIndex}");
-            var removed = EditorFields.Delete($"##{id}item{itemIndex}delete", width);
-            ImGui.PopID();
-            if (removed)
-            {
-                items.RemoveAt(itemIndex);
-                return true;
-            }
-        }
-
-        ImGui.Spacing();
-        if (Widgets.Button($"##{id}additem", "ADD ITEM", FontAwesomeIcon.Plus, new Vector2(width, 30f * Widgets.Scale), ButtonTone.Ghost))
-        {
-            items.Add(new JsonObject { ["name"] = string.Empty, ["description"] = string.Empty, ["price"] = string.Empty });
-            return true;
-        }
-
-        return changed;
-    }
-
-    private static bool DrawRules(JsonArray rules)
-    {
-        using var card = Widgets.Card(Palette.Electric);
-        var changed = false;
-        for (var ruleIndex = 0; ruleIndex < rules.Count; ruleIndex++)
-        {
-            ImGui.PushID(ruleIndex);
-            var text = rules[ruleIndex] is JsonValue value && value.TryGetValue<string>(out var rule) ? rule : string.Empty;
-            ImGui.SetNextItemWidth(card.InnerWidth - 36f * Widgets.Scale);
-            if (ImGui.InputTextWithHint("##rule", "Be kind to staff and guests.", ref text, 200))
-            {
-                rules[ruleIndex] = text;
-                changed = true;
-            }
-
-            ImGui.SameLine(0f, 8f * Widgets.Scale);
-            var removed = Widgets.IconButton($"##rule{ruleIndex}remove", FontAwesomeIcon.Times, 28f * Widgets.Scale, "Remove rule", Palette.Danger);
-            ImGui.PopID();
-            if (removed)
-            {
-                rules.RemoveAt(ruleIndex);
-                return true;
-            }
-        }
-
-        if (Widgets.Button("##addrule", "ADD RULE", FontAwesomeIcon.Plus, new Vector2(card.InnerWidth, 30f * Widgets.Scale), ButtonTone.Ghost))
-        {
-            rules.Add(string.Empty);
-            return true;
-        }
-
-        return changed;
     }
 
     private static bool PairOfFields(JsonObject node, float half, Func<JsonObject, float, bool> left, Func<JsonObject, float, bool> right)

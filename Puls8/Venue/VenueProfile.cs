@@ -18,12 +18,6 @@ public sealed class VenueProfile
 
     public VenueEvent[] Events { get; init; } = [];
 
-    public StaffMember[] Staff { get; init; } = [];
-
-    public MenuSection[] Menu { get; init; } = [];
-
-    public string[] Rules { get; init; } = [];
-
     public VenueLink[] Links { get; init; } = [];
 
     public SyncEntry[] Sync { get; init; } = [];
@@ -70,33 +64,6 @@ public sealed class VenueEvent
     public string Blurb { get; init; } = string.Empty;
 
     public DateTimeOffset Ends => Starts.AddMinutes(Minutes);
-}
-
-public sealed class StaffMember
-{
-    public string Name { get; init; } = string.Empty;
-
-    public string Role { get; init; } = string.Empty;
-
-    public string Image { get; init; } = string.Empty;
-}
-
-public sealed class MenuSection
-{
-    public string Section { get; init; } = string.Empty;
-
-    public MenuItem[] Items { get; init; } = [];
-}
-
-public sealed class MenuItem
-{
-    public string Name { get; init; } = string.Empty;
-
-    public string Description { get; init; } = string.Empty;
-
-    public string Price { get; init; } = string.Empty;
-
-    public string Image { get; init; } = string.Empty;
 }
 
 public sealed class VenueLink

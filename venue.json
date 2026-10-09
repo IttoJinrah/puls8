@@ -25,33 +25,6 @@
       "blurb": "Sample event. Replace this entry in venue.json with the real lineup."
     }
   ],
-  "staff": [
-    { "name": "Arka", "role": "Owner" },
-    { "name": "Sample Name", "role": "Host" },
-    { "name": "Sample Name", "role": "Bartender" },
-    { "name": "Sample Name", "role": "Resident DJ" }
-  ],
-  "menu": [
-    {
-      "section": "Drinks (sample)",
-      "items": [
-        { "name": "Neon Sunset", "description": "Sample item. Replace with the real menu.", "price": "50k" },
-        { "name": "Grid Runner", "description": "Sample item.", "price": "50k" }
-      ]
-    },
-    {
-      "section": "Services (sample)",
-      "items": [
-        { "name": "Private Booth", "description": "Sample service.", "price": "1m" }
-      ]
-    }
-  ],
-  "rules": [
-    "Be kind to staff and guests.",
-    "No harassment or unsolicited emotes.",
-    "Keep the dance floor clear of mounts and minions.",
-    "Have fun and dress the part."
-  ],
   "links": [
     { "label": "Discord", "url": "https://discord.gg/puls8", "kind": "discord" }
   ],

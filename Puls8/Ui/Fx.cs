@@ -152,21 +152,6 @@ public static class Fx
         }
     }
 
-    // Crops like CSS object-fit: cover. focusY biases portraits toward the top, where faces usually are.
-    public static void ImageCover(ImDrawListPtr drawList, ImTextureID texture, Vector2 textureSize, Vector2 min, Vector2 max, float rounding, float focusY = 0.25f)
-    {
-        var frame = max - min;
-        if (textureSize.X <= 0f || textureSize.Y <= 0f || frame.X <= 0f || frame.Y <= 0f)
-        {
-            return;
-        }
-
-        var scale = MathF.Max(frame.X / textureSize.X, frame.Y / textureSize.Y);
-        var visible = new Vector2(frame.X / (textureSize.X * scale), frame.Y / (textureSize.Y * scale));
-        var uv0 = new Vector2((1f - visible.X) * 0.5f, (1f - visible.Y) * focusY);
-        drawList.AddImageRounded(texture, min, max, uv0, uv0 + visible, Palette.U32(Palette.Core), rounding);
-    }
-
     public static void Scanlines(ImDrawListPtr drawList, Vector2 min, Vector2 max, float alpha)
     {
         var line = Palette.U32(Palette.Void, alpha);

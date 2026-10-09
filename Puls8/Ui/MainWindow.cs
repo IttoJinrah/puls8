@@ -9,7 +9,6 @@ public enum Page : byte
 {
     Home,
     Events,
-    Lounge,
     Wifi,
     Mods,
     About,
@@ -33,12 +32,11 @@ public sealed class MainWindow : Window, IDisposable
     private static readonly Vector2 MaximumSize = new(1100f, 1400f);
     private static readonly WindowSizeConstraints ExpandedConstraints = new() { MinimumSize = new Vector2(480f, 560f), MaximumSize = MaximumSize };
     private static readonly WindowSizeConstraints CompactConstraints = new() { MinimumSize = new Vector2(480f, HeaderHeight), MaximumSize = MaximumSize };
-    private static readonly string[] TabLabels = ["HOME", "EVENTS", "LOUNGE", "WIFI", "MODS", "ABOUT", "STAFF"];
+    private static readonly string[] TabLabels = ["HOME", "EVENTS", "WIFI", "MODS", "ABOUT", "STAFF"];
 
     private readonly Plugin plugin;
     private readonly HomePage home;
     private readonly EventsPage events;
-    private readonly LoungePage lounge;
     private readonly WifiPage wifi;
     private readonly ModsPage mods;
     private readonly AboutPage about;
@@ -65,7 +63,6 @@ public sealed class MainWindow : Window, IDisposable
         AllowClickthrough = false;
         home = new HomePage(plugin, Show);
         events = new EventsPage(plugin);
-        lounge = new LoungePage(plugin);
         wifi = new WifiPage(plugin);
         mods = new ModsPage(plugin);
         about = new AboutPage(plugin);
@@ -385,9 +382,6 @@ public sealed class MainWindow : Window, IDisposable
                     break;
                 case Page.Events:
                     events.Draw();
-                    break;
-                case Page.Lounge:
-                    lounge.Draw();
                     break;
                 case Page.Wifi:
                     wifi.Draw();

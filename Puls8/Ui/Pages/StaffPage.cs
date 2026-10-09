@@ -9,13 +9,12 @@ public enum StaffSection : byte
 {
     Events,
     Hours,
-    Lounge,
     Club,
 }
 
 public sealed partial class StaffPage
 {
-    private static readonly string[] SectionLabels = ["EVENTS", "HOURS", "LOUNGE", "CLUB"];
+    private static readonly string[] SectionLabels = ["EVENTS", "HOURS", "CLUB"];
 
     private readonly Plugin plugin;
     private StaffSection section;
@@ -51,7 +50,6 @@ public sealed partial class StaffPage
             {
                 StaffSection.Events => DrawEvents(draft),
                 StaffSection.Hours => DrawHours(draft),
-                StaffSection.Lounge => DrawLounge(draft),
                 _ => DrawClub(draft),
             };
 
@@ -62,7 +60,6 @@ public sealed partial class StaffPage
         }
 
         EditorFields.PopStyle();
-        fileDialog.Draw();
     }
 
     private void DrawUnlock()

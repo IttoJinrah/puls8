@@ -33,7 +33,6 @@ public sealed class Plugin : IDalamudPlugin
         Installer = new PackInstaller(Configuration, Penumbra, Catalog, Mannequins);
         Travel = new TravelService(new LifestreamBridge());
         Staff = new StaffSession(Configuration, Feed);
-        Images = new RemoteImages();
         Installer.Bind(Feed.Current);
         Feed.Changed += OnVenueChanged;
 
@@ -76,8 +75,6 @@ public sealed class Plugin : IDalamudPlugin
 
     public StaffSession Staff { get; }
 
-    public RemoteImages Images { get; }
-
     public void Dispose()
     {
         Services.Commands.RemoveHandler(CommandName);
@@ -92,7 +89,6 @@ public sealed class Plugin : IDalamudPlugin
         mainWindow.Dispose();
         Installer.Dispose();
         Penumbra.Dispose();
-        Images.Dispose();
         Fonts.Dispose();
     }
 
@@ -151,7 +147,6 @@ public sealed class Plugin : IDalamudPlugin
         {
             "wifi" or "sync" => Page.Wifi,
             "events" => Page.Events,
-            "menu" or "lounge" => Page.Lounge,
             "mods" or "update" => Page.Mods,
             "about" => Page.About,
             "staff" => Page.Staff,
