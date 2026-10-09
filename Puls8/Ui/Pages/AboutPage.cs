@@ -54,9 +54,9 @@ public sealed class AboutPage
     {
         Widgets.SectionTitle("MADE BY", 101);
         using var card = Widgets.Card(Palette.Magenta);
-        DrawCredit("Arka", "Puls8 venue, packs and the original plugin", Palette.Magenta);
+        DrawCredit("Arka", "Original plugin", Palette.Magenta);
         ImGui.Spacing();
-        DrawCredit("XeldarAlz", "Plugin overhaul: design, installer, travel and wifi", Palette.Cyan);
+        DrawCredit("XeldarAlz", "Plugin overhaul, UI design, mod installer, travel and wifi", Palette.Cyan);
         ImGui.Spacing();
         if (Widgets.Button("##repo", "SOURCE ON GITHUB", FontAwesomeIcon.Code, new Vector2(card.InnerWidth, 34f * Widgets.Scale), ButtonTone.Ghost))
         {
