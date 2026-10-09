@@ -45,7 +45,7 @@ public sealed partial class StaffPage
         {
             var width = card.InnerWidth;
             changed |= EditorFields.Text(draft, "name", "CLUB NAME", width);
-            changed |= EditorFields.Text(draft, "tagline", "TAGLINE", width, "Synthwave nightclub on Raiden");
+            changed |= EditorFields.Text(draft, "tagline", "TAGLINE", width, "Rooftop Lounge and Pool");
             changed |= EditorFields.Multiline(draft, "description", "DESCRIPTION", width, 5);
         }
 
