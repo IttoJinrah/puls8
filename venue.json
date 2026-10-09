@@ -10,7 +10,7 @@
     "ward": 7,
     "plot": 16
   },
-  "timeZone": "Europe/London",
+  "timeZone": "Europe/Istanbul",
   "schedule": [
     {
       "day": "Friday",
@@ -23,16 +23,7 @@
       "close": "02:00"
     }
   ],
-  "events": [
-    {
-      "id": "event-20261009181835",
-      "title": "New event",
-      "host": "",
-      "starts": "2026-10-16T21:00:00+03:00",
-      "minutes": 180,
-      "blurb": ""
-    }
-  ],
+  "events": [],
   "links": [
     {
       "label": "Discord",
