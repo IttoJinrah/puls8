@@ -12,32 +12,47 @@
   },
   "timeZone": "Europe/London",
   "schedule": [
-    { "day": "Friday", "open": "21:00", "close": "01:00" },
-    { "day": "Saturday", "open": "21:00", "close": "02:00" }
+    {
+      "day": "Friday",
+      "open": "21:00",
+      "close": "01:00"
+    },
+    {
+      "day": "Saturday",
+      "open": "21:00",
+      "close": "02:00"
+    }
   ],
   "events": [
     {
-      "id": "sample-retrowave-night",
-      "title": "Retrowave Night (sample)",
-      "host": "DJ Placeholder",
-      "starts": "2026-10-16T21:00:00+01:00",
-      "minutes": 240,
-      "blurb": "Sample event. Replace this entry in venue.json with the real lineup."
+      "id": "event-20261009181835",
+      "title": "New event",
+      "host": "",
+      "starts": "2026-10-16T21:00:00+03:00",
+      "minutes": 180,
+      "blurb": ""
     }
   ],
   "links": [
-    { "label": "Discord", "url": "https://discord.gg/puls8", "kind": "discord" }
+    {
+      "label": "Discord",
+      "url": "https://discord.gg/puls8",
+      "kind": "discord"
+    }
   ],
   "sync": [
     {
       "service": "Lightless",
       "kind": "syncshell",
       "id": "LLS-EZBSD40L6PAZ",
-      "password": "Club_Puls8"
+      "password": "Club_Puls8",
+      "note": ""
     },
     {
       "service": "PlayerSync",
       "kind": "zonesync",
+      "id": "",
+      "password": "",
       "note": "We don't run a PlayerSync syncshell. Turn on ZoneSync instead and you'll sync with everyone in the club automatically."
     }
   ],
@@ -50,7 +65,8 @@
       "folder": "Puls8_Cityscape",
       "target": "mannequin",
       "collection": "Puls8",
-      "priority": 100
+      "priority": 100,
+      "allOptions": false
     },
     {
       "id": "venuepack",
@@ -59,6 +75,7 @@
       "tagPrefix": "venue_pack-v",
       "folder": "Puls8_VenuePack",
       "target": "base",
+      "collection": "",
       "priority": 100,
       "allOptions": true
     }
