@@ -3,10 +3,7 @@ using Penumbra.Api.Enums;
 
 namespace Puls8.Mods;
 
-public readonly record struct MannequinSpot(int ObjectIndex, nint Address, string Name, float Distance, bool Linked);
-
-// Temporary: a session-only collection assigned per object. Saved: the legacy persistent "Puls8" collection.
-public readonly record struct MannequinTarget(Guid Collection, bool Temporary, int Generation);
+public readonly record struct MannequinSpot(int ObjectIndex, string Name, float Distance, bool Linked);
 
 public sealed class MannequinLinker
 {
@@ -19,19 +16,16 @@ public sealed class MannequinLinker
     ];
 
     private readonly List<MannequinSpot> spots = new(8);
-    private readonly HashSet<nint> attempted = new();
-    private readonly HashSet<nint> temporaryLinks = new();
-    private uint knownTerritory;
-    private int knownGeneration = -1;
+    private readonly HashSet<int> attempted = new();
+    private uint attemptedTerritory;
 
     public IReadOnlyList<MannequinSpot> Spots => spots;
 
-    public void Scan(PenumbraBridge penumbra, MannequinTarget target)
+    public void Scan(PenumbraBridge penumbra, Guid collection)
     {
-        ForgetIfStale(target);
         spots.Clear();
         var player = Services.Objects.LocalPlayer;
-        if (player is null || target.Collection == Guid.Empty)
+        if (player is null)
         {
             return;
         }
@@ -45,46 +39,47 @@ public sealed class MannequinLinker
                 continue;
             }
 
-            var linked = target.Temporary
-                ? temporaryLinks.Contains(gameObject.Address)
-                : IsSavedLink(penumbra, gameObject.ObjectIndex, target.Collection);
+            var assignment = penumbra.CollectionFor(gameObject.ObjectIndex);
+            var linked = collection != Guid.Empty && assignment.IndividualSet && assignment.EffectiveId == collection;
             var distance = Vector3.Distance(player.Position, gameObject.Position);
-            spots.Add(new MannequinSpot(gameObject.ObjectIndex, gameObject.Address, gameObject.Name.TextValue, distance, linked));
+            spots.Add(new MannequinSpot(gameObject.ObjectIndex, gameObject.Name.TextValue, distance, linked));
         }
 
         spots.Sort(static (left, right) => left.Distance.CompareTo(right.Distance));
     }
 
-    public int LinkAll(PenumbraBridge penumbra, TemporaryVenue venue, MannequinTarget target) => LinkUnlinked(penumbra, venue, target, false);
+    public int LinkAll(PenumbraBridge penumbra, Guid collection) => LinkUnlinked(penumbra, collection, false);
 
     // Auto-link tries each object once per visit so a refused assignment can't spam Penumbra every few seconds.
-    public int AutoLink(PenumbraBridge penumbra, TemporaryVenue venue, MannequinTarget target)
+    public int AutoLink(PenumbraBridge penumbra, Guid collection)
     {
-        Scan(penumbra, target);
-        return LinkUnlinked(penumbra, venue, target, true);
+        var territory = Services.ClientState.TerritoryType;
+        if (territory != attemptedTerritory)
+        {
+            attempted.Clear();
+            attemptedTerritory = territory;
+        }
+
+        Scan(penumbra, collection);
+        return LinkUnlinked(penumbra, collection, true);
     }
 
-    private int LinkUnlinked(PenumbraBridge penumbra, TemporaryVenue venue, MannequinTarget target, bool oncePerVisit)
+    private int LinkUnlinked(PenumbraBridge penumbra, Guid collection, bool oncePerVisit)
     {
         var linked = 0;
         for (var spotIndex = 0; spotIndex < spots.Count; spotIndex++)
         {
             var spot = spots[spotIndex];
-            if (spot.Linked || (oncePerVisit && !attempted.Add(spot.Address)))
+            if (spot.Linked || (oncePerVisit && !attempted.Add(spot.ObjectIndex)))
             {
                 continue;
             }
 
-            var code = target.Temporary ? venue.Assign(spot.ObjectIndex) : penumbra.AssignCollection(spot.ObjectIndex, target.Collection);
+            var code = penumbra.AssignCollection(spot.ObjectIndex, collection);
             if (code is not (PenumbraApiEc.Success or PenumbraApiEc.NothingChanged))
             {
                 Services.Log.Warning($"Penumbra refused the mannequin assignment for object {spot.ObjectIndex}: {code}");
                 continue;
-            }
-
-            if (target.Temporary)
-            {
-                temporaryLinks.Add(spot.Address);
             }
 
             penumbra.Redraw(spot.ObjectIndex);
@@ -93,26 +88,5 @@ public sealed class MannequinLinker
         }
 
         return linked;
-    }
-
-    // Objects are recreated on zone change and a rebuilt temporary collection has no assignments, so both reset the memory.
-    private void ForgetIfStale(MannequinTarget target)
-    {
-        var territory = Services.ClientState.TerritoryType;
-        if (territory == knownTerritory && target.Generation == knownGeneration)
-        {
-            return;
-        }
-
-        knownTerritory = territory;
-        knownGeneration = target.Generation;
-        attempted.Clear();
-        temporaryLinks.Clear();
-    }
-
-    private static bool IsSavedLink(PenumbraBridge penumbra, int objectIndex, Guid collection)
-    {
-        var assignment = penumbra.CollectionFor(objectIndex);
-        return assignment.IndividualSet && assignment.EffectiveId == collection;
     }
 }
