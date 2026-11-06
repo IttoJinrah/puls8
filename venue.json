@@ -18,7 +18,16 @@
       "close": "05:00"
     }
   ],
-  "events": [],
+  "events": [
+    {
+      "id": "event-20261106153537",
+      "title": "SPONGEBOB & FINAL FANTASY: MPREG RAVE?!",
+      "host": "Dj ?!",
+      "starts": "2026-11-06T23:00:00+03:00",
+      "minutes": 360,
+      "blurb": "Who let Bikini Bottom into Eorzea?!\n\nTonight, Puls8 is throwing the crossover nobody asked for but somehow absolutely needed. \n\nExpect questionable decisions, questionable outfits, and beats that go harder than they have any right to.\n\n� THE VIBE\nSpongeBob meets Eorzea\nFinal Fantasy brainrot\nChronically online energy\nUnhinged rave fits encouraged\nZero explanation required\n\n� Puls8 — Lavender Beds W7 P16\n⏰ Tonight | 8 PM ST\n\nBring your weirdest glam. Bring your worst memes. Bring that one friend who needs professional internet supervision.\n\nSHOW UP. GET WEIRD. TOUCH NO GRASS."
+    }
+  ],
   "links": [
     {
       "label": "Discord",
